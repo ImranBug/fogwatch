@@ -87,15 +87,17 @@ body{color:var(--ink);font:700 1rem/1.15 var(--f-ui);font-variant-numeric:tabula
 /* ENEMY RADAR: one icon per enemy, anchored at its centre (zero-size .en); every move and fade is a CSS transition, the pop runs once */
 #radar .en{position:fixed;width:0;height:0;transition:left .35s ease-out,top .35s ease-out,opacity .4s;--s:1;--g:0;--ch:1;--rg:0;--c:var(--warn)}
 #radar .en.seen{--c:var(--high)}#radar .en.ally{--c:#4fd18b}#radar .en.tray,#radar .en.dead{--c:#3a4452}
-#radar img{position:absolute;left:0;top:0;width:3rem;height:3rem;border-radius:3px;transform:translate(-50%,-50%) scale(var(--s));box-shadow:0 0 0 2px var(--c),0 0 .6rem #000;
-  filter:grayscale(var(--g)) brightness(calc(1 - var(--g) * .4));transition:transform .35s ease-out,filter .4s,box-shadow .4s}
+#radar img{position:absolute;left:0;top:0;width:3rem;height:3rem;border-radius:3px;transform:translate(-50%,-50%) scale(var(--s));
+  filter:grayscale(var(--g)) brightness(calc(1 - var(--g) * .4)) drop-shadow(0 .1rem .35rem rgba(0,0,0,.9));transition:transform .35s ease-out,filter .4s}
 #radar .rot{position:absolute;left:0;top:0;transform:rotate(var(--a,0rad));opacity:var(--ch);transition:opacity .5s}
-#radar .chev{position:absolute;left:calc(1.55rem * var(--s) + .1rem);top:-.65rem;width:1.3rem;height:1.3rem;fill:var(--c);stroke:#000;stroke-width:1;filter:drop-shadow(0 0 .3rem #000)}
+#radar .chev{position:absolute;left:calc(1.6rem * var(--s) + .1rem);top:-1rem;width:2rem;height:2rem;fill:var(--c);stroke:#000;stroke-width:1;filter:drop-shadow(0 0 .3rem #000)}
 #radar .ring{position:absolute;left:0;top:0;width:3.8rem;height:3.8rem;border:2px dashed var(--c);border-radius:50%;transform:translate(-50%,-50%) scale(var(--s));opacity:var(--rg);transition:opacity .5s,transform .35s}
 #radar span{position:absolute;left:0;top:calc(1.5rem * var(--s) + .15rem);transform:translateX(-50%);font-size:.85rem;color:var(--ink-2);text-shadow:0 1px 2px #000;white-space:nowrap;text-transform:none;letter-spacing:0}
 #radar .en.pop img{animation:rpop .45s cubic-bezier(.2,1.6,.4,1) both,rflash .5s ease-out .45s 2}
 @keyframes rpop{from{transform:translate(-50%,-50%) scale(calc(var(--s) * 2.4));opacity:0}}
-@keyframes rflash{from{box-shadow:0 0 0 3px var(--high),0 0 0 .6rem rgba(255,77,79,.55),0 0 2rem var(--high)}}
+@keyframes rflash{from{filter:drop-shadow(0 0 .5rem var(--high)) drop-shadow(0 0 1.2rem var(--high))}}
+#radar .en.hot .chev{transform-origin:30% 50%;animation:rpulse .5s ease-in-out infinite alternate}   /* allowed loop: only while a gank looks close */
+@keyframes rpulse{from{transform:scale(1)}to{transform:scale(1.6) translateX(.25rem)}}
 .arw.fog .chev{left:calc(var(--z) / -2);top:calc(var(--z) / -2);width:var(--z);height:var(--z);animation:none}
 .arw.fog.t1{--z:3.2rem;opacity:.6}.arw.fog.t2{--z:5rem}
 .arw.fog.go .chev{animation:nudge .45s ease-in-out 2 alternate}   /* twice, at the onset of a close cue only */
@@ -104,7 +106,7 @@ body{color:var(--ink);font:700 1rem/1.15 var(--f-ui);font-variant-numeric:tabula
 .arw.fog.t1 .lab{padding:.15rem .3rem;box-shadow:0 0 0 1px #07090c}.arw.fog.t1 .lab img{width:1.9rem;height:1.9rem}
 .arw .drain{position:absolute;left:3px;right:0;bottom:0;height:4px;background:rgba(255,255,255,.14)}.arw .drain b{display:block;height:100%;background:var(--c)}
 .arw.fog.t1 .drain{display:none}
-@media (prefers-reduced-motion: reduce){#radar .en.pop img,.pill,.pill.big,.arw .chev,.arw .lab.seen,.arw.fog.go .chev,#mm .ping{animation:none}#glow,#mm .gh,.chip{transition:none}}
+@media (prefers-reduced-motion: reduce){#radar .en.pop img,#radar .en.hot .chev,.pill,.pill.big,.arw .chev,.arw .lab.seen,.arw.fog.go .chev,#mm .ping{animation:none}#glow,#mm .gh,.chip{transition:none}}
 </style>
 </head>
 <body>
@@ -236,7 +238,7 @@ const sprite = h => {
 //                  fades into a dashed ring and the icon greys and shrinks. fog.py's p10 (could be on me within 10 s) keeps it big while it is a threat
 //  lost         -> its reach covers me and it is no threat, or it has no position (respawned, never seen): slides into the tray above the minimap, small and grey
 //  dead         -> tray, grey, respawn seconds
-const RUN = 330, ALLY_R = 5000, GAP = .11, ago = a => !num(a) ? '' : a < 60 ? `${Math.floor(a / 5) * 5 || Math.floor(a)}s` : `${Math.floor(a / 60)}m`;   // u/s in fog; min rad between two edge icons
+const RUN = 330, ALLY_R = 5000, GAP = .11, MERGE = .26, DANGER_D = 1600, ago = a => !num(a) ? '' : a < 60 ? `${Math.floor(a / 5) * 5 || Math.floor(a)}s` : `${Math.floor(a / 60)}m`;   // u/s in fog; min rad between two edge icons
 const cl = v => Math.max(0, Math.min(1, v));
 function radar(fog, me, r, sz) {
   const el = $('radar'), clock = W.game?.clock, ok = me.alive !== false && num(me.x) && num(me.y), kx = sz ? innerWidth / sz[0] : 1, ky = sz ? innerHeight / sz[1] : 1;
@@ -251,13 +253,13 @@ function radar(fog, me, r, sz) {
     if (!ok || !num(x) || !num(y)) { tray.push({...o, mode: 'tray', txt: ago(age)}); continue; }
     const dx = x - me.x, dy = y - me.y, d = Math.hypot(dx, dy), a = Math.atan2(-dy, dx), near = cl(1 - (d - 1200) / 4800);   // 1 within 1200 u, 0 from 6000 u
     if (seen) {
-      edge.push({...o, mode: 'seen', a, s: .7 + .55 * near, g: 0, op: .55 + .45 * near, ch: 1, rg: 0, txt: ''});
+      edge.push({...o, mode: 'seen', a, d, s: .7 + .55 * near, g: 0, op: .55 + .45 * near, ch: 1, rg: 0, txt: '', hot: d <= DANGER_D});
       if (d < wd) { wd = d; worst = {a, n: 1, m: 1}; }
       continue;
     }
     const R = age * RUN, u = R >= d ? 1 : cl(Math.asin(R / d) / (Math.PI / 2)), t = cl(p10 / .4), pr = Math.max(near * (1 - u), t);   // u: how unsure the direction is; pr: prominence
     if ((u >= 1 && t < .35) || age > 60) { tray.push({...o, mode: 'tray', txt: ago(age)}); continue; }
-    edge.push({...o, mode: 'fog', a, s: .6 + .5 * pr, g: cl(u - t), op: .45 + .5 * pr, ch: 1 - u, rg: u, txt: ago(age)});
+    edge.push({...o, mode: 'fog', a, d, s: .6 + .5 * pr, g: cl(u - t), op: .45 + .5 * pr, ch: 1 - u, rg: u, txt: ago(age), hot: p10 >= .3});   // hot: fog.py thinks it could be on me within 10 s
   }
   // ALLIES (user 2026-11-24): teammates within ALLY_R on the same edge, green, smaller and steadier than enemies (no pop, no tray): which way help is
   const mine = hshort(me.hero).replace(/\W/g, '');
@@ -267,10 +269,30 @@ function radar(fog, me, r, sz) {
     const dx = e.x - me.x, dy = e.y - me.y, d = Math.hypot(dx, dy);
     if (d < 1 || d > ALLY_R) continue;
     const near = cl(1 - (d - 1200) / (ALLY_R - 1200));
-    edge.push({h, slot: 0, ally: true, mode: 'ally', a: Math.atan2(-dy, dx), s: .5 + .25 * near, g: 0, op: .5 + .35 * near, ch: 1, rg: 0, txt: ''});
+    edge.push({h, slot: 0, ally: true, mode: 'ally', d, a: Math.atan2(-dy, dx), s: .5 + .25 * near, g: 0, op: .5 + .35 * near, ch: 1, rg: 0, txt: ''});
   }
-  edge.sort((p, q) => p.a - q.a).forEach((p, i, A) => { if (i && p.a - A[i - 1].a < GAP) p.a = A[i - 1].a + GAP; });   // side by side, never on top of each other
-  for (const p of edge) { p.x = innerWidth / 2 + Math.cos(p.a) * innerWidth * .44; p.y = Math.max(.12, Math.min(.74, .47 + Math.sin(p.a) * .37)) * innerHeight; }
+  // GROUPS (user 2026-11-24): heroes of one side within MERGE rad of each other share ONE arrow, their icons side by side along the edge. An enemy
+  // arrow pulses while a gank looks close: one in sight within DANGER_D, a fog hero fog.py rates likely on me within 10 s, or 2+ enemies in sight together.
+  const groups = [];
+  for (const p of edge.sort((p, q) => p.a - q.a)) {
+    const g = groups.find(g => g.ally === !!p.ally && Math.abs(Math.atan2(Math.sin(p.a - g.a), Math.cos(p.a - g.a))) < MERGE);
+    if (g) { g.m.push(p); g.sx += Math.cos(p.a); g.sy += Math.sin(p.a); g.a = Math.atan2(g.sy, g.sx); }
+    else groups.push({ally: !!p.ally, a: p.a, sx: Math.cos(p.a), sy: Math.sin(p.a), m: [p]});
+  }
+  groups.sort((p, q) => p.a - q.a).forEach((g, i, A) => { const gap = GAP * (g.m.length + (i ? A[i - 1].m.length : 0)) / 2; if (i && g.a - A[i - 1].a < gap) g.a = A[i - 1].a + gap; });
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  for (const g of groups) {
+    const ax = innerWidth / 2 + Math.cos(g.a) * innerWidth * .44, ay = Math.max(.12, Math.min(.74, .47 + Math.sin(g.a) * .37)) * innerHeight;
+    const sp = 3.3 * rem * Math.max(...g.m.map(p => p.s)), tx = -Math.sin(g.a), ty = Math.cos(g.a);
+    const seen = g.m.some(p => p.mode === 'seen'), hot = !g.ally && (g.m.some(p => p.hot) || g.m.filter(p => p.mode === 'seen' && p.d <= 3000).length >= 2);
+    g.m.sort((p, q) => q.s - p.s).forEach((p, i) => {   // the most prominent in the middle, under the arrow
+      const k = i === 0 ? 0 : i % 2 ? Math.ceil(i / 2) : -i / 2;
+      Object.assign(p, {a: g.a, x: Math.max(.04 * innerWidth, Math.min(.96 * innerWidth, ax + tx * k * sp)), y: Math.max(.1 * innerHeight, Math.min(.78 * innerHeight, ay + ty * k * sp))});   // on screen, below the top bar
+    });
+    const L = g.m[0];
+    Object.assign(L, {ch: Math.max(...g.m.map(p => p.ch)), hot, col: g.ally ? '' : seen ? 'var(--high)' : 'var(--warn)'});
+    for (const p of g.m.slice(1)) p.ch = 0;
+  }
   for (const p of tray) {   // fixed slots in top-bar order along the minimap's top edge (bottom-right corner when its geometry is unknown)
     Object.assign(p, {s: .55, g: .9, op: p.mode === 'dead' ? .4 : .6, ch: 0, rg: 0, a: 0});
     p.x = r ? (r[0] + (p.slot + .5) * r[2] / 5) * kx : innerWidth * (.82 + p.slot * .035); p.y = r ? r[1] * ky - 22 : innerHeight * .74;
@@ -280,10 +302,14 @@ function radar(fog, me, r, sz) {
     const n = node(`r:${p.ally ? 'a:' : ''}${p.h}`, () => born(mkNode(el, `<div class="rot"><svg class="chev" viewBox="0 0 24 24"><path d="M5 3l14 9-14 9 4-9z"/></svg></div><i class="ring"></i><img src="${CDN}${p.h}.png" alt="" onerror="this.parentNode.hidden=true"><span></span>`)));
     if (p.mode === 'seen' && n._m !== 'seen') n._pop = now;   // came into sight (also: first seen this match)
     n._m = p.mode;
-    const cls = `en ${p.mode}${now - (n._pop || -1e9) < 1400 ? ' pop' : ''}`;
+    const cls = `en ${p.mode}${now - (n._pop || -1e9) < 1400 ? ' pop' : ''}${p.hot ? ' hot' : ''}`;
     if (put(n, '_c', cls)) n.className = cls;
-    const css = `left:${Math.round(p.x)}px;top:${Math.round(p.y)}px;--a:${p.a.toFixed(2)}rad;--s:${p.s.toFixed(2)};--g:${p.g.toFixed(1)};--ch:${p.ch.toFixed(1)};--rg:${p.rg.toFixed(1)}`;
-    if (put(n, '_css', css)) n.style.cssText = css + `;opacity:${n._o}`;
+    const css = `left:${Math.round(p.x)}px;top:${Math.round(p.y)}px;--a:${p.a.toFixed(2)}rad;--s:${p.s.toFixed(2)};--g:${p.g.toFixed(1)};--ch:${p.ch.toFixed(1)};--rg:${p.rg.toFixed(1)}${p.col ? ';--c:' + p.col : ''}`;
+    if (put(n, '_css', css)) {
+      const first = !n._placed; n._placed = 1;
+      n.style.cssText = css + `;opacity:${n._o}` + (first ? ';transition:none' : '');   // a new icon appears where it belongs: no slide in from the corner
+      if (first) { getComputedStyle(n).left; n.style.transition = ''; }
+    }
     fade(n, +p.op.toFixed(1));
     if (put(n, '_x', p.txt)) n.lastChild.textContent = p.txt;
   }

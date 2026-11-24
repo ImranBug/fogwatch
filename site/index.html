@@ -91,13 +91,19 @@ footer{padding:40px 0 60px;color:var(--ink-2);font-size:14px;border-top:1px soli
 </section>
 
 <section>
-  <h2>Three colours, one glance</h2>
-  <p class="lead">Fogwatch reads your minimap 10 times a second. Every enemy keeps one icon on your screen, pointing the way you'd have to look.</p>
+  <h2>One glance is enough</h2>
+  <p class="lead">Fogwatch reads your minimap 10 times a second. Every enemy keeps one icon on your screen, pointing the way you'd have to look. No labels, no pop-ups: just faces and arrows.</p>
   <div class="states">
     <div class="state" style="--c:var(--red)"><b>In sight</b><p>The icon pops onto the screen edge the moment they appear, bigger the closer they are.</p></div>
     <div class="state" style="--c:var(--amber)"><b>Last seen</b><p>They walked into the fog. The arrow points to where you last saw them, with the seconds since.</p></div>
     <div class="state" style="--c:var(--grey)"><b>Trail gone cold</b><p>Once they could be anywhere, the arrow fades into a ring and the icon steps back to a tray above your minimap.</p></div>
+    <div class="state" style="--c:var(--red)"><b>Gank coming</b><p>Heroes from the same side share one arrow. It pulses when a gank looks close: an enemy near you, or several together.</p></div>
+    <div class="state" style="--c:#4fd18b"><b>Teammates</b><p>Allies nearby show in green, smaller and calmer, so you always know which way help is.</p></div>
   </div>
+  <figure>
+    <video src="img/radar.mp4" autoplay muted loop playsinline width="1600" height="900" style="width:100%;height:auto;display:block;border-radius:6px;border:1px solid var(--line)" aria-label="Six seconds of a recorded game with Fogwatch's radar: enemy icons appearing and moving on the screen edge"></video>
+    <figcaption>Six real seconds from a recorded game, radar drawn by Fogwatch from that game's state.</figcaption>
+  </figure>
 </section>
 
 <section>
