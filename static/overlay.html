@@ -183,6 +183,8 @@ function arrowsOld(hud, me, dg) {
     if (hero && !s.heroes.includes(hero)) s.heroes.push(hero); if (kind === 'seen' || (kind === 'smoke' && s.kind !== 'seen')) s.kind = kind;
   };
   for (const t of hud.threats || []) add(t.x, t.y, t.kind, t.hero);
+  for (const [s, e] of Object.entries(W.heroes || {}))  // every enemy in sight nearby, not only at danger 2+ (player, 2026-11-12)
+    if (e && !e.ally && e.visible && !e.dead && num(e.x) && Math.hypot(e.x - me.x, e.y - me.y) <= 2500) add(e.x, e.y, 'seen', s);
   for (const m of hud.mia || []) {  // walked into fog: where it could be now (reach circle r); only if it could be on me within ~12 s
     const eta = Math.max(0, Math.hypot(m.x - me.x, m.y - me.y) - (m.r || 0)) / 350;
     if (eta <= 12) add(m.x, m.y, 'missing', m.hero, Math.round(eta));
@@ -322,8 +324,6 @@ function fogLayer(hud, fog, me) {
     return true;
   };
   for (const t of hud.threats || []) if (t.kind === 'smoke') add(t.x, t.y, t.kind, t.hero);   // enemies in sight and fog cues are the radar's
-  for (const [s, e] of Object.entries(W.heroes || {}))  // every enemy in sight nearby, not only at danger 2+ (player, 2026-11-12)
-    if (e && !e.ally && e.visible && !e.dead && num(e.x) && Math.hypot(e.x - me.x, e.y - me.y) <= 2500) add(e.x, e.y, 'seen', s);
   if (hud.fight) add(hud.fight.x, hud.fight.y, 'fight');
   let worst = null;
   for (const s of Object.values(sec)) {
@@ -475,7 +475,7 @@ if (Q.has('mock')) {
     W = {game: {state: 'DOTA_GAMERULES_STATE_GAME_IN_PROGRESS', clock: c}, attention: {level: 'none', sticky: false}, me: {alive: true, x: -2000, y: -1500}, settings: {},
       cv: CV,
       hud: {}, obj: {rosh: {state: 'alive', pit: 'bot'}}, timers: [], talk: {stage: 'idle'}, coach: {quiet: false, verbosity: 'normal'},
-      ...m, glance: {danger: 0, mia: 1, rosh: 'alive', action: {word: 'JUNGLE', icon: 'farm', p: .55}, ...m.glance}};
+      ...m, glance: {danger: 0, mia: 1, rosh: 'alive', action: {word: 'JUNGLE', icon: 'farm', p: .55}, ...m.glance}, ...window.MOCK_W};   // MOCK_W: a recorded world row (screenshots of real moments)
     render();
   };
   tick(); setInterval(tick, 250);
