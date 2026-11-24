@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fogwatch: an enemy radar for Dota 2 on macOS</title>
+<meta name="description" content="Free, open-source enemy radar for Dota 2 on macOS. All five enemy heroes on the edge of your screen: red in sight, amber where last seen, grey when the trail goes cold.">
+<meta property="og:title" content="Fogwatch: know where they were, guess where they are">
+<meta property="og:description" content="A free enemy radar for Dota 2 on macOS. It only remembers what your own minimap showed you.">
+<meta property="og:image" content="https://imranbug.github.io/fogwatch/img/radar.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--bg:#0c0f14;--panel:#141922;--line:#262e3b;--ink:#ece4d2;--ink-2:#a9a293;--red:#ff4d4f;--amber:#ffb02e;--grey:#6b7686}
+*{box-sizing:border-box}
+body{margin:0;overflow-x:hidden;background:var(--bg);color:var(--ink);font:400 17px/1.6 Inter,system-ui,sans-serif}
+a{color:var(--amber)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+header{display:flex;align-items:center;justify-content:space-between;padding:18px 0}
+.mark{font:800 26px/1 "Barlow Condensed",sans-serif;letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;gap:10px}
+.mark i{width:14px;height:14px;border-radius:50%;background:var(--amber);box-shadow:0 0 0 4px rgba(255,176,46,.2)}
+header a{color:var(--ink-2);text-decoration:none;font-weight:600}
+h1{font:800 clamp(36px,9vw,84px)/.95 "Barlow Condensed",sans-serif;text-transform:uppercase;margin:28px 0 18px;letter-spacing:.01em}
+h1 em{font-style:normal;color:var(--amber)}
+h2{font:800 clamp(30px,4vw,44px)/1 "Barlow Condensed",sans-serif;text-transform:uppercase;margin:0 0 16px}
+.lead{font-size:20px;color:var(--ink-2);max-width:640px;margin:0 0 28px}
+.cta{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:10px;background:var(--amber);color:#14100a;font:800 22px/1 "Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.04em;padding:16px 26px;border-radius:4px;text-decoration:none}
+.btn:hover{filter:brightness(1.08)}
+.alt{color:var(--ink-2);font-size:15px}
+.cmd{margin-top:18px;max-width:720px}
+.cmd label{display:block;font-size:14px;color:var(--ink-2);margin-bottom:6px}
+.cmd div{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.cmd code{flex:1;min-width:0;padding:13px 14px;font:14px/1.4 ui-monospace,Menlo,monospace;color:var(--ink);overflow-x:auto;white-space:nowrap}
+.cmd button{border:0;border-left:1px solid var(--line);background:#1b2230;color:var(--ink);font:600 14px Inter,sans-serif;padding:0 16px;cursor:pointer}
+.note{border-left:4px solid var(--amber);background:var(--panel);padding:16px 18px;border-radius:0 4px 4px 0;max-width:720px}
+.note strong{display:block;font:800 22px/1.1 "Barlow Condensed",sans-serif;text-transform:uppercase;margin-bottom:6px}
+[hidden]{display:none!important}
+figure{margin:44px 0 0}
+figure img{width:100%;height:auto;display:block;border-radius:6px;border:1px solid var(--line)}
+figcaption{color:var(--ink-2);font-size:14px;margin-top:8px}
+section{padding:64px 0;border-top:1px solid var(--line)}
+section:first-of-type{border-top:0}
+.states{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px;margin-top:22px}
+.state{padding-top:14px;border-top:4px solid var(--c)}
+.state b{font:800 24px/1 "Barlow Condensed",sans-serif;text-transform:uppercase;color:var(--c)}
+.state p{margin:8px 0 0;color:var(--ink-2)}
+.rules{list-style:none;padding:0;margin:20px 0 0;max-width:720px}
+.rules li{padding:12px 0 12px 34px;border-bottom:1px solid var(--line);position:relative}
+.rules li::before{content:"✕";position:absolute;left:4px;color:var(--red);font-weight:600}
+.rules li.yes::before{content:"✓";color:#4fd18b}
+ol.steps{max-width:720px;padding-left:22px}
+ol.steps li{margin:10px 0}
+footer{padding:40px 0 60px;color:var(--ink-2);font-size:14px;border-top:1px solid var(--line)}
+@media (max-width:600px){body{font-size:16px}.btn{width:100%;justify-content:center}.lead{font-size:18px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><div class="mark"><i></i>Fogwatch</div><a href="https://github.com/ImranBug/fogwatch">GitHub</a></header>
+
+<section>
+  <h1>Know where they were.<br><em>Guess where they are.</em></h1>
+  <p class="lead">A free enemy radar for Dota 2 on macOS. All five enemy heroes sit on the edge of your screen: red when you can see them, amber where they were last seen, grey when the trail goes cold.</p>
+
+  <div id="mac">
+    <div class="cta">
+      <a class="btn" href="https://github.com/ImranBug/fogwatch/archive/refs/heads/main.zip">Download for Mac</a>
+      <span class="alt">Free · open source · no account</span>
+    </div>
+    <div class="cmd">
+      <label for="one">Easiest: paste this into Terminal. It installs everything and starts Fogwatch.</label>
+      <div><code id="one">curl -fsSL https://imranbug.github.io/fogwatch/install.sh | bash</code><button id="copy" type="button">Copy</button></div>
+    </div>
+    <p class="alt">Using the zip instead? Unzip it, then right-click <code>start.command</code> → Open (macOS asks once because the app isn't from the App Store).</p>
+  </div>
+
+  <div id="win" class="note" hidden>
+    <strong>On Windows? Help me test it</strong>
+    Fogwatch runs on macOS today. I'm looking for Windows players to help bring it over. If you'd like to help, email me at <a href="mailto:imran.bug81@gmail.com?subject=Fogwatch%20Windows%20tester">imran.bug81@gmail.com</a>.
+  </div>
+  <div id="other" class="note" hidden>
+    <strong>Made for macOS</strong>
+    Open this page on a Mac to download. On Windows and want to help test a port? Email <a href="mailto:imran.bug81@gmail.com?subject=Fogwatch%20Windows%20tester">imran.bug81@gmail.com</a>.
+  </div>
+
+  <figure>
+    <img src="img/radar.jpg" width="1600" height="900" alt="Dota 2 gameplay with Fogwatch's radar: enemy hero icons on the screen edge, one ringed in amber where it was last seen">
+    <figcaption>Fogwatch's radar drawn over a recorded game. Other players' names are blurred.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>Three colours, one glance</h2>
+  <p class="lead">Fogwatch reads your minimap 10 times a second. Every enemy keeps one icon on your screen, pointing the way you'd have to look.</p>
+  <div class="states">
+    <div class="state" style="--c:var(--red)"><b>In sight</b><p>The icon pops onto the screen edge the moment they appear, bigger the closer they are.</p></div>
+    <div class="state" style="--c:var(--amber)"><b>Last seen</b><p>They walked into the fog. The arrow points to where you last saw them, with the seconds since.</p></div>
+    <div class="state" style="--c:var(--grey)"><b>Trail gone cold</b><p>Once they could be anywhere, the arrow fades into a ring and the icon steps back to a tray above your minimap.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>Not a cheat. A memory.</h2>
+  <p class="lead">Fogwatch can't see into the fog. It only remembers what your own screen already showed you, and works out how far a hero could have walked since.</p>
+  <ul class="rules">
+    <li class="yes">Reads your own screen and Valve's official Game State Integration</li>
+    <li>Never reads game memory</li>
+    <li>Never presses a key or moves your mouse</li>
+    <li>Never changes game files (apart from the one data file Valve's integration needs)</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Set up in three steps</h2>
+  <ol class="steps">
+    <li>Install with the Terminal line above (or the zip).</li>
+    <li>Steam → Dota 2 → Properties → Launch Options: add <code>-gamestateintegration</code>.</li>
+    <li>System Settings → Privacy &amp; Security → Screen Recording: allow Terminal. Then play: the radar appears at the horn.</li>
+  </ol>
+  <p class="alt">Optional AI coach: paste your own OpenAI, Jev or Anthropic key in the dashboard to add a game plan, advice and a post-game review. It's off by default, and with it off Fogwatch never makes a paid call.</p>
+</section>
+
+<footer>
+  Fogwatch is free and open source (MIT) · <a href="https://github.com/ImranBug/fogwatch">Source on GitHub</a> · Not affiliated with or endorsed by Valve. Dota 2 is a trademark of Valve Corporation.
+</footer>
+</div>
+<script>
+const ua = navigator.userAgent, plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
+const isMac = /Mac/i.test(plat) && !/iPhone|iPad/i.test(ua) && navigator.maxTouchPoints < 2, isWin = /Win/i.test(plat) || /Windows/i.test(ua);
+if (!isMac) { document.getElementById('mac').hidden = true; document.getElementById(isWin ? 'win' : 'other').hidden = false; }
+document.getElementById('copy').onclick = e => navigator.clipboard.writeText(document.getElementById('one').textContent)
+  .then(() => { e.target.textContent = 'Copied'; setTimeout(() => e.target.textContent = 'Copy', 1500); });
+</script>
+</body>
+</html>

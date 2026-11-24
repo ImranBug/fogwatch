@@ -6,6 +6,8 @@ The coach only gives advice. It never reads game memory, sends inputs, or modifi
 
 ## Quick start (macOS)
 
+Website: https://imranbug.github.io/fogwatch/ · one-line install: `curl -fsSL https://imranbug.github.io/fogwatch/install.sh | bash`
+
 Fogwatch shows where the five enemy heroes are, or were last seen, as icons around the edge of your screen while you play. That needs no account and no API key and costs nothing.
 
 1. Install [uv](https://docs.astral.sh/uv/): `curl -LsSf https://astral.sh/uv/install.sh | sh`
