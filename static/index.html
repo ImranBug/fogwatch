@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" type="image/png" href="/img/favicon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fogwatch · Dota 2 coach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Barlow+Semi+Condensed:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* "Companion HUD": stone panels, bronze rings, one meaning per colour. Severity: ok = can do now, warn, high = danger/enemy. Gold = gold amounts only. */
+:root{
+  --s-0:#0b0f14;--s-1:#141a22;--s-2:#1b232d;--s-3:#252f3b;--s-inset:#07090c;
+  --panel-grad:linear-gradient(180deg,#1b232d 0%,#141a22 55%,#10151c 100%);
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.05'/%3E%3C/svg%3E");
+  --ink:#ece4d2;--ink-2:#a89f8c;--ink-3:#6f6858;
+  --bronze-d:#3a3123;--bronze:#6b5a3e;--bronze-l:#9c8458;--gold:#e0b866;--gold-d:#c9a75e;
+  --ok:#3ddc84;--warn:#ffb02e;--high:#ff4d4f;--ally:#4ea1ff;--enemy:var(--high);
+  --bevel:inset 0 1px 0 rgba(255,236,200,.08),inset 0 -1px 0 rgba(0,0,0,.6);
+  --frame:0 0 0 1px var(--s-inset),0 0 0 2px var(--bronze-d);
+  --lift:0 6px 18px rgba(0,0,0,.55);
+  --f-display:"Cinzel","Avenir Next Condensed",Georgia,serif;
+  --f-ui:"Barlow Semi Condensed","Avenir Next Condensed","Arial Narrow",system-ui,sans-serif;
+  --e-out:cubic-bezier(.2,.8,.2,1);--e-snap:cubic-bezier(.3,1.4,.5,1);
+  --strip:56px;--gap:16px;--mapw:min(640px,37vw,calc(100vh - var(--strip) - 3 * var(--gap) - 200px))}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px}
+body{background:var(--s-0) var(--grain);color:var(--ink);font:500 18px/1.3 var(--f-ui);-webkit-font-smoothing:antialiased;
+  height:100vh;overflow:hidden;display:grid;grid-template-rows:var(--strip) minmax(0,1fr);font-variant-numeric:tabular-nums}
+.mute{color:var(--ink-2)} .b{font-weight:700} img{display:block} [hidden]{display:none!important}
+.g{color:var(--gold)}
+.ico{width:1em;height:1em;flex:none;display:inline-block;vertical-align:middle}
+.pn,.panel{position:relative;background:var(--grain),var(--panel-grad);border-radius:2px;box-shadow:var(--frame),var(--bevel),var(--lift);padding:14px 18px;min-width:0;min-height:0;overflow:hidden}
+.lab,.ttl{font:700 16px/1 var(--f-display);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);display:flex;gap:10px;align-items:center;white-space:nowrap}
+.lab::after,.ttl::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--bronze),var(--bronze-d) 60%,transparent)}
+.ttl{margin-bottom:10px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:2px;font:700 16px/1.2 var(--f-ui);letter-spacing:.04em;white-space:nowrap;
+  color:var(--ink-2);background:var(--s-inset);box-shadow:inset 0 0 0 1px var(--bronze-d)}
+.chip.warn{color:var(--warn)}.chip.high{color:var(--high)}.chip.ok{color:var(--ok)}
+button{font:700 17px/1 var(--f-ui);letter-spacing:.05em;text-transform:uppercase;color:var(--ink);padding:12px 16px;min-height:44px;border:0;border-radius:2px;cursor:pointer;
+  background:linear-gradient(180deg,#2a3542,#1a222c);box-shadow:0 0 0 1px var(--s-inset),inset 0 1px 0 rgba(255,236,200,.12),inset 0 0 0 1px var(--bronze-d);transition:filter .12s var(--e-out)}
+button:hover{filter:brightness(1.18)} button:active{filter:brightness(.9)} button:disabled{opacity:.45;cursor:default}
+button:focus-visible{outline:2px solid var(--bronze-l);outline-offset:2px}
+button.on{color:#fff;background:linear-gradient(180deg,#3a4656,#232d39);box-shadow:0 0 0 1px var(--s-inset),inset 0 0 0 2px var(--bronze-l)}
+button.auto{box-shadow:0 0 0 1px var(--s-inset),inset 0 0 0 2px var(--ink-2);background:transparent}
+button.auto::after{content:" auto";font-weight:600;color:var(--ink-2);text-transform:none}
+button.ok{box-shadow:0 0 0 1px var(--s-inset),inset 0 0 0 2px var(--ok)!important}
+/* strip */
+#strip{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:20px;padding:0 20px;white-space:nowrap;position:relative;z-index:5;
+  background:linear-gradient(180deg,#1b232d,#0f141a);box-shadow:inset 0 1px 0 rgba(255,236,200,.06),inset 0 -2px 0 var(--bronze-d),0 1px 0 #000}
+#strip>div{display:flex;align-items:center;gap:18px;min-width:0}
+#strip .sr{justify-content:flex-end}
+#me{display:flex;align-items:center;gap:12px;font:700 22px/1 var(--f-ui)}
+#me img{width:40px;height:40px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 2px var(--bronze),0 0 0 3px #000}
+#me small{font:700 16px var(--f-display);color:var(--ink-2);letter-spacing:.08em}
+#clock{font:700 40px/1 var(--f-ui);letter-spacing:.02em}
+#dn{display:flex;align-items:center;gap:4px;font-size:26px;color:var(--ink-2)}#dn small{font-size:14px;font-weight:700}
+#phase{font:700 16px/1 var(--f-display);letter-spacing:.14em;color:var(--ink-2)}
+body.paused::after{content:'GAME PAUSED';position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.6);
+  color:var(--warn);font:700 72px/1 var(--f-ui);letter-spacing:.12em;pointer-events:none;z-index:999}
+body.paused #clock{color:var(--warn)}
+#flags,#exc{display:flex;gap:12px;align-items:center;font:700 16px var(--f-ui);letter-spacing:.08em}
+#goal{display:inline-flex;align-items:baseline;gap:10px;font:700 28px/1 var(--f-ui);color:var(--ink)}
+#goal small{font:700 16px var(--f-display);letter-spacing:.12em;color:var(--ink-2);text-transform:uppercase}
+#goal i{font-style:normal;font-weight:600;color:var(--ink-2)}
+#goal.warn b{color:var(--warn)}#goal.high b{color:var(--high)}
+.hd{display:inline-flex;align-items:center;gap:8px;font:700 16px var(--f-ui);letter-spacing:.06em;color:var(--warn)}
+.hd i{width:12px;height:12px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 2px #000}.hd.bad i{background:var(--warn)}
+.recd{display:inline-flex;align-items:center;gap:6px;color:var(--ink-2)}.recd i{width:10px;height:10px;border-radius:50%;background:var(--ink-2)}
+#gear{padding:8px 10px;min-height:40px;font-size:24px}#gear .ico{width:24px;height:24px}
+#toast{color:var(--ok);font:700 16px var(--f-ui);letter-spacing:.06em;overflow:hidden;text-overflow:ellipsis}#toast.bad{color:var(--high)}
+#pgBan{padding:8px 14px;min-height:40px}
+/* views */
+main{min-height:0;position:relative}
+.view{display:none;height:100%;gap:var(--gap);padding:var(--gap);min-height:0}
+.view.on{display:flex}
+#v-auto.on{display:block;padding:0}
+.col{display:flex;flex-direction:column;gap:var(--gap);min-height:0;min-width:0}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap)}
+#v-full{--map:min(calc(100vh - var(--strip) - 6rem),50vw)}
+#v-map{--map:min(calc(100vh - var(--strip) - 2 * var(--gap)),calc(100vw - 30rem))}
+.mapcol{width:var(--map);flex:none}
+/* PLAY: fixed slots. P = primary card; S1-S3 and B1-B4 never move; the replica map keeps the right slot */
+#play{display:grid;grid-template-columns:minmax(0,1fr) var(--mapw);gap:var(--gap);height:100%;padding:var(--gap)}
+#left{position:relative;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:minmax(0,40fr) minmax(0,33fr) minmax(0,27fr);gap:var(--gap);min-height:0}
+#pc{grid-area:1/1/2/13}#s1{grid-area:2/1/3/5}#s2{grid-area:2/5/3/9}#s3{grid-area:2/9/3/13}
+#b1{grid-area:3/1/4/4}#b2{grid-area:3/4/4/7}#b3{grid-area:3/7/4/10}#b4{grid-area:3/10/4/13}
+#right{display:flex;flex-direction:column;gap:var(--gap);min-height:0}
+#mapslot{padding:0;flex:none;width:100%;aspect-ratio:1}
+body[data-sev=calm] #mapslot{opacity:.95}
+#cue{flex:1;display:flex;flex-direction:column;gap:12px}
+#cue .cl{font:600 24px/1.3 var(--f-ui);color:var(--ink-2);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+#cue .ca{font:600 18px var(--f-ui);color:var(--ink-3)}
+#cue .cw{display:flex;align-items:center;gap:16px;font:800 64px/1 var(--f-display);color:var(--ink-2)}#cue .cw .ico{width:64px;height:64px}
+.dim{color:var(--ink-3)!important}
+/* primary card */
+#pc{--pw:110px;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:36px;padding:24px 40px}
+#pc .pi .ico{width:120px;height:120px;color:var(--ink-2);filter:drop-shadow(0 2px 0 #000)}
+#pc .pt{min-width:0}
+#pc .pw{font:800 var(--pw)/1.02 var(--f-display);letter-spacing:.03em;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-shadow:0 2px 0 #000,0 0 18px rgba(0,0,0,.6)}
+#pc .pw.strong{color:var(--ink)}#pc .pw.ready{color:var(--ok)}
+#pc .pc{display:flex;align-items:center;gap:14px;margin-top:14px;font:600 32px/1.2 var(--f-ui);color:var(--ink-2);min-width:0}
+#pc .pc b{font-weight:800;color:inherit}
+#pc .cz{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-width:0}
+#pc .hi{width:112px;height:63px;object-fit:cover;border-radius:2px;box-shadow:0 0 0 1px #000,0 0 0 2px var(--bronze);flex:none}
+#pc .pl{display:flex;align-items:center;gap:16px;margin-top:18px;font:800 40px/1 var(--f-ui);color:#fff}#pc .pl svg{width:64px;height:64px;display:block}
+#pc .pm{display:flex;align-items:center;gap:18px;margin-top:20px;font:700 32px/1 var(--f-ui);color:var(--ink-2)}
+#pc .pm .meter{width:260px;height:20px}
+#pc .pm .warn{color:var(--warn)}#pc .pm .high{color:var(--high)}
+#pc.info .pw{color:var(--ink)}#pc.info .pi .ico{color:var(--ink)}
+#pc.warn{background:var(--grain),linear-gradient(180deg,color-mix(in srgb,var(--warn) 24%,#1b232d),color-mix(in srgb,var(--warn) 14%,#10151c));
+  box-shadow:var(--frame),inset 6px 0 0 var(--warn),0 0 0 3px #ffb02e33,var(--lift)}
+#pc.warn .pw,#pc.warn .pc{color:var(--ink)}#pc.warn .pi .ico{color:var(--warn)}
+#pc.high{--pw:176px;position:absolute;inset:0;grid-area:1/1/4/13;z-index:3;padding:48px 60px;align-content:center;
+  background:var(--grain),linear-gradient(180deg,#7a1c18 0%,#4e1311 55%,#2a0a0c 100%);box-shadow:var(--frame),0 0 0 3px #ff4d4f99,inset 0 0 90px #ff3b3055,var(--lift)}
+#pc.high .pw{color:#fff}#pc.high .pi .ico{width:180px;height:180px;color:#fff}
+#pc.high .pc{font-size:40px;color:#ffd2c8;margin-top:22px}#pc.high .hi{width:128px;height:72px}#pc.high .pl svg{width:84px;height:84px}#pc.high .pl{font-size:52px}
+#pc.high .pm{color:#ffd2c8;margin-top:32px}#pc.high .pm .meter{width:340px}#pc.high .pm .high,#pc.high .pm .warn{color:#fff}
+#play.warn .slot{opacity:.55}
+/* pre-horn brief: the one goal large, the lane job under it, the talk hint small (also a banner on the draft screen) */
+.brief .bg{font:800 60px/1.1 var(--f-display);letter-spacing:.01em;color:var(--ink);text-shadow:0 2px 0 #000;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.brief .bl{font:600 32px/1.2 var(--f-ui);color:var(--ink-2);margin-top:16px}
+.brief .bt{font:600 22px/1.2 var(--f-ui);color:var(--ink-3);margin-top:14px}
+#pc.brief .pi .ico{color:var(--bronze-l)}
+.dbr{flex:none;display:flex;align-items:center;gap:28px;padding:16px 24px}.dbr>.ico{width:64px;height:64px;color:var(--bronze-l)}
+.dbr .bg{font-size:40px;-webkit-line-clamp:1}.dbr .bl{font-size:26px;margin-top:6px}.dbr .bt{display:none}
+/* slots */
+.slot{display:flex;flex-direction:column;gap:12px}
+.slot .val{display:flex;align-items:center;gap:14px;font:700 56px/1 var(--f-ui);color:var(--ink);min-width:0;white-space:nowrap}
+.slot .sub{font:600 24px/1.2 var(--f-ui);color:var(--ink-2);display:flex;flex-direction:column;gap:8px;min-width:0}
+.slot .sub>*{min-width:0}
+.slot .val{margin-top:12px}
+#left>.slot:nth-child(n+5) .val{font-size:52px}
+.slot.dim .val{color:var(--ink-3)}.slot.ready .val{color:var(--ok)}.slot.warn .val{color:var(--warn)}.slot.high .val{color:var(--high)}
+.slot .val .ico{width:44px;height:44px}
+.slot .nm{font:700 26px/1.15 var(--f-ui);color:var(--ink);white-space:normal}
+.ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ab{position:relative;flex:none}
+.ab img,.ab .tal{width:112px;height:112px;border-radius:2px;box-shadow:0 0 0 1px #000,0 0 0 2px var(--bronze)}
+.ab .kb{position:absolute;left:-6px;bottom:-6px;min-width:34px;padding:4px 7px;text-align:center;font:700 20px/1 var(--f-display);font-style:normal;color:var(--ink);
+  background:linear-gradient(180deg,#2a3542,#11161d);box-shadow:0 0 0 1px #000,inset 0 0 0 1px var(--bronze)}
+.tal{display:inline-grid;place-items:center;font:700 16px/1 var(--f-display);letter-spacing:.06em;color:var(--ink-2);background:var(--s-inset);box-shadow:inset 0 0 0 1px var(--bronze)}
+.then{display:flex;align-items:center;gap:8px}
+.then small{font:700 16px var(--f-display);letter-spacing:.1em;color:var(--ink-3)}
+.then img{height:40px;width:auto;border-radius:2px;box-shadow:0 0 0 1px #000,0 0 0 2px var(--bronze-d)}
+.then .tal{height:40px;padding:0 6px;font-size:16px}
+.itm{width:140px;aspect-ratio:88/64;object-fit:cover;border-radius:2px;flex:none;box-shadow:0 0 0 1px #000,0 0 0 2px var(--bronze),0 4px 10px rgba(0,0,0,.6)}
+.ready .itm{box-shadow:0 0 0 1px #000,0 0 0 2px var(--ok)}
+.icol{display:flex;flex-direction:column;gap:6px;min-width:0}
+.cost{font:700 34px/1 var(--f-ui);display:flex;align-items:center;gap:6px}.cost .ico{width:28px;height:28px}
+.gbar{position:relative;height:22px;background:var(--s-inset);box-shadow:inset 0 1px 2px #000,0 0 0 1px var(--bronze-d);overflow:hidden}
+.gbar i{position:absolute;inset:0 auto 0 0;background:linear-gradient(180deg,#ecd391 0 2px,var(--gold-d) 2px,#8a6f3a)}
+.gbar b{position:relative;display:block;text-align:center;font:700 16px/22px var(--f-ui);text-shadow:0 1px 1px #000}
+.trow{display:flex;align-items:center;gap:10px;font:600 22px/1 var(--f-ui);color:var(--ink-2)}.trow .ico{width:22px;height:22px}.trow b{margin-left:auto;color:var(--ink);font-weight:700}
+.trow.lo{opacity:.55}
+.mi{display:flex;gap:6px}.mi img{width:40px;height:40px;border-radius:2px;filter:grayscale(.6);box-shadow:0 0 0 1px #000,0 0 0 2px var(--bronze-d)}
+.meter{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;height:12px;width:100%}
+.meter i{background:#222830;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+.meter i.on{background:var(--ink-2)}.meter.warn i.on{background:var(--warn)}.meter.high i.on{background:var(--high)}
+/* dead (layout swap; map stays) */
+/* why first (d1), then smaller: respawn (d0), buyback (d2), buy list + skill (d3). .nod = no debrief from the server: d1 is the respawn clock */
+#deadc{display:none;position:absolute;inset:0;z-index:2;grid-template-columns:minmax(0,5fr) minmax(0,7fr);grid-template-rows:minmax(0,46fr) minmax(0,21fr) minmax(0,33fr);gap:var(--gap)}
+#d1{grid-area:1/1/2/3}#d0{grid-area:2/1/3/2}#d2{grid-area:3/1/4/2}#d3{grid-area:2/2/4/3}
+#deadc.nod #d0{display:none}#deadc.nod #d2{grid-area:2/1/4/2}
+.why{display:flex;flex-direction:column;justify-content:center;gap:16px;height:calc(100% - 16px);padding:0 8px}
+.why .yw{font:800 34px/1 var(--f-display);letter-spacing:.14em;color:var(--ink-2)}.why .yw.ok{color:var(--ok)}
+.why .yl{font:700 56px/1.12 var(--f-ui);color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.why .yb{display:flex;align-items:center;gap:14px;font:600 28px/1.2 var(--f-ui);color:var(--ink-2);min-width:0;white-space:nowrap}
+.why .yb img{width:96px;height:54px;object-fit:cover;border-radius:2px;flex:none;box-shadow:0 0 0 1px #000,0 0 0 2px var(--bronze)}
+.why .yb b{color:var(--ink)}.why .yb .sep{color:var(--ink-3)}
+.why .yg{font:700 34px/1.2 var(--f-ui);color:var(--ink)}.why .yg.warn{color:var(--warn)}.why .yg.high{color:var(--high)}
+.rsp.sm{gap:20px}.rsp.sm .ico{width:64px;height:64px}.rsp.sm .num{font-size:96px}
+.bbv{flex-wrap:wrap}
+#play.dead #deadc{display:grid}
+#play.dead :is(#pc,.slot){visibility:hidden}
+.rsp{display:flex;align-items:center;gap:36px;height:calc(100% - 16px);color:var(--ink)}.rsp .ico{width:130px;height:130px;color:var(--ink-2)}
+.rsp .num{font:700 200px/1 var(--f-ui)}
+.bbv{display:flex;align-items:center;gap:16px;margin-top:14px;font:800 60px/1 var(--f-ui);color:var(--ink-3)}.bbv .ico{width:52px;height:52px}
+.bbv small{font:600 30px var(--f-ui);color:var(--ink-2)}.bbv.ok{color:var(--ok)}.bbv.cd{color:var(--ink-2)}
+.irow{display:flex;align-items:center;gap:18px;margin-top:12px;font:700 30px/1 var(--f-ui);color:var(--ink-2)}
+.irow img{width:88px;aspect-ratio:88/64;object-fit:cover;border-radius:2px;box-shadow:0 0 0 1px #000,0 0 0 2px var(--bronze-d)}
+.irow b{margin-left:auto;display:flex;align-items:center;gap:8px}.irow b .ico{width:28px;height:28px}
+.irow.ok,.irow.sk{color:var(--ink)}.irow.sk b{font-family:var(--f-display)}.irow.ok b{color:var(--ok)}.irow.dim img{opacity:.6}
+.irow em{font:700 16px var(--f-ui);font-style:normal;letter-spacing:.1em;color:var(--ink-2);box-shadow:inset 0 0 0 1px var(--bronze);padding:3px 6px}
+.irow .ab img,.irow .ab .tal{width:64px;height:64px}
+/* draft: both teams' picks as they appear on the pick screen */
+.teams{display:flex;gap:24px;flex-wrap:wrap;margin:0 0 14px}.teams .tm{flex:1 1 280px}.teams .tr{display:flex;gap:6px;margin-top:6px}
+.teams .th{flex:1;aspect-ratio:16/9;border-radius:4px;overflow:hidden;background:var(--panel-2,#1b1f24);display:grid;place-items:center;color:var(--ink-3)}
+.teams .th img{width:100%;height:100%;object-fit:cover}
+/* full-screen states: wait, draft, post */
+#big{height:100%;padding:28px 40px;display:flex;flex-direction:column;gap:22px;min-height:0}
+.dsym{display:inline-block;aspect-ratio:634/591;background:linear-gradient(160deg,#d2492f,#9b3425 55%,#5e1a12);
+  -webkit-mask:url(/img/dota2_logo_symbol.png) center/contain no-repeat;mask:url(/img/dota2_logo_symbol.png) center/contain no-repeat}
+#logo{height:34px;flex:none}
+#brand{font:700 20px/1 var(--f-display);letter-spacing:.18em;color:var(--bronze-l,#b08d57);margin:0 18px 0 10px;flex:none}
+.wt .lg .app{font:700 min(5vh,46px)/1 var(--f-display);letter-spacing:.32em;color:var(--bronze-l,#b08d57);margin-top:6px}
+.wt .lg .app small{display:block;font:600 min(2.2vh,20px)/1 var(--f-ui);letter-spacing:.5em;text-transform:uppercase;color:var(--ink-3);margin-top:12px}
+.wt .lg{display:flex;flex-direction:column;align-items:center;gap:22px;margin-bottom:40px}.wt .lg .sym{height:min(30vh,300px)}.wt .lg{filter:drop-shadow(0 0 30px rgba(180,40,30,.35))}.wt .lg .wm{height:min(7vh,70px)}
+.wt{margin:auto;text-align:center;max-width:70%}.wt .w1{font:600 48px/1.2 var(--f-ui);color:var(--ink-2)}.wt .w2{font:500 24px/1.3 var(--f-ui);color:var(--ink-3);margin-top:18px}
+.wt .w1.ok{color:var(--ok)}.wt .w1.act{color:var(--ink)}.wt .w1 .ico{width:.9em;height:.9em;margin-right:14px;vertical-align:-.08em}
+/* waiting with continuity: identity + state on the left, last game / goal / 5 games / ready check on the right */
+.ww{display:flex;align-items:center;justify-content:center;gap:56px;height:100%;min-height:0}
+.ww.has .wt{flex:1 1 0;max-width:none;margin:0}.ww.has .wt .lg{margin-bottom:28px;gap:16px}.ww.has .wt .lg .sym{height:min(22vh,220px)}.ww.has .wt .lg .wm{height:min(5vh,50px)}
+.ww.has .wt .w1{font-size:38px}
+.wside{flex:1.35 1 0;display:flex;flex-direction:column;gap:var(--gap);min-width:0}
+.wrow{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap)}
+.lg1{display:flex;align-items:center;gap:16px;margin-top:14px}.lg1 img{width:112px;height:63px;object-fit:cover;border-radius:2px;flex:none;box-shadow:0 0 0 1px #000,0 0 0 2px var(--bronze)}
+.lg1 .res{display:block;font:800 40px/1 var(--f-display);letter-spacing:.03em}.lg1 .mute,.ngw{font:600 20px/1.2 var(--f-ui);color:var(--ink-2);margin-top:6px}
+.lg2{font:600 26px/1.2 var(--f-ui);color:var(--ink-2);margin-top:14px}.lg2 b{font:700 40px/1 var(--f-ui);color:var(--ink);margin-right:6px}
+.gm{display:inline-flex;align-items:center;gap:8px;font:700 24px/1 var(--f-ui);margin-top:12px}.gm.ok{color:var(--ok)}.gm.bad{color:var(--high)}
+.ng{font:800 44px/1.1 var(--f-display);color:var(--ink);margin-top:18px;text-shadow:0 2px 0 #000}
+.g5{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}
+.gc{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:2px 10px;padding:10px 12px;background:var(--s-inset);box-shadow:inset 0 0 0 1px var(--bronze-d);min-width:0}
+.gc.cur{box-shadow:inset 0 0 0 2px var(--bronze-l)}
+.gc img{width:40px;height:40px;border-radius:50%;box-shadow:0 0 0 2px var(--bronze-d)}
+.gc .wl{font:800 22px/1 var(--f-display)}.gc .wl.win{color:var(--ok)}.gc .wl.loss{color:var(--high)}
+.gc .gd{grid-column:1/3;display:flex;align-items:baseline;gap:8px;font:700 40px/1 var(--f-ui);margin-top:6px}.gc .gd small{font:600 18px var(--f-ui);color:var(--ink-2)}
+.gc .gd .ico{width:22px;height:22px;margin-left:auto;align-self:center;color:var(--high)}.gc .gd .ico.ok{color:var(--ok)}
+.gc .gw{grid-column:1/3;font:600 16px/1.2 var(--f-ui);color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rcs{display:grid;gap:4px;margin-top:10px}
+.rc{display:grid;grid-template-columns:14px 8.5rem minmax(0,1fr) auto;align-items:center;gap:12px;min-height:44px;font:600 22px/1.2 var(--f-ui)}
+.rc b{font-weight:700}.rc button{padding:8px 14px;min-height:40px;font-size:16px}
+.drh{display:flex;align-items:center;gap:24px}.drh .lab{flex:none}.drh .lab::after{display:none}
+.seg{display:flex;gap:6px}.seg button{font-size:24px;padding:14px 22px;min-height:64px;text-transform:none}.seg button b{font-size:30px;margin-right:6px}
+.picks{display:flex;gap:22px;align-items:center;flex:1;min-height:0}
+.pick{flex:1 1 0;display:flex;flex-direction:column;gap:10px;min-width:0;padding:16px}
+.pick.top{flex-grow:1.25}
+.pick.picked{flex:0 1 420px;margin:0 auto}   /* my own pick: one modest card, not a full-width portrait (player, 2026-11-12) */
+.pick img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:2px;box-shadow:0 0 0 1px #000,0 0 0 2px var(--bronze)}
+.pick .kb{align-self:flex-start;font:700 20px/1 var(--f-display);letter-spacing:.1em;padding:6px 10px;color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink-2)}
+.pick .kb.you{background:#3a3020;box-shadow:inset 0 0 0 1px var(--bronze-l)}
+.pick .nm{font:700 34px/1.1 var(--f-ui)}.pick .wr{font:700 56px/1 var(--f-ui)}
+.pick .why,.pick .pos{font:600 22px/1.2 var(--f-ui);color:var(--ink-2)}.pick .pos{color:var(--ink-3)}
+.pick.top .nm{font-size:40px}.pick.top .wr{font-size:68px}
+.wrb{height:10px;background:#222830}.wrb i{display:block;height:100%;background:var(--ink-2)}
+.trb{font:600 24px var(--f-ui);color:var(--ink-2)}.trb .warn{color:var(--warn)}
+/* post-game: the goal result leads and the match result sits beside it; without a goal the match result is the lead */
+#big.post{overflow:auto}#big.post>*{flex:none}
+.pgh{display:flex;align-items:center;gap:32px}.pgh img{height:120px;border-radius:2px;box-shadow:0 0 0 1px #000,0 0 0 2px var(--bronze)}
+.pgr{font:800 110px/1 var(--f-display);letter-spacing:.02em;text-shadow:0 2px 0 #000}
+.pgg{display:flex;align-items:center;gap:28px;flex:1;min-width:0}.pgg>.ico{width:104px;height:104px}
+.pgg .gw{font:800 96px/1 var(--f-display);letter-spacing:.02em;text-shadow:0 2px 0 #000;white-space:nowrap}
+.pgg .gt{font:600 30px/1.2 var(--f-ui);color:var(--ink-2);margin-top:10px}.pgg .gt b{color:var(--ink)}
+.pgg.ok{color:var(--ok)}.pgg.bad{color:var(--high)}
+.pgm{display:flex;align-items:center;gap:20px}.pgm .mute{font:600 22px/1.2 var(--f-ui);margin-top:8px}
+.pgh.hasg .pgm{margin-left:auto}.pgh.hasg .pgm img{height:84px}.pgh.hasg .pgr{font-size:52px}
+.pgn{display:flex;align-items:center;gap:24px;padding:18px 24px}.pgn>.ico{width:56px;height:56px;color:var(--bronze-l)}
+.pgn .lab::after{display:none}.pgn .ng{margin-top:8px}
+.pgx summary{cursor:pointer;list-style:none;font:700 16px/1 var(--f-display);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);padding:8px 0}
+.pgx summary::-webkit-details-marker{display:none}.pgx summary::before{content:"▸ "}.pgx[open] summary::before{content:"▾ "}
+.pgx summary:hover{color:var(--ink-2)}.pgx .pgl{margin:12px 0 16px}.pgx .pgl li{font-size:24px}.pgx .pgc{margin-top:8px;font-size:20px;overflow-wrap:anywhere}
+.pgd{font:600 24px var(--f-ui);color:var(--ink-2);display:flex;gap:24px;align-items:center}.pgd .w{color:var(--ok)}.pgd .u{color:var(--high)}
+.dt{position:relative;height:170px;margin:0 48px;flex:none}
+.dt .trk{position:absolute;left:0;right:0;top:80px;height:10px;background:var(--s-3);box-shadow:inset 0 1px 2px #000,0 0 0 1px var(--bronze-d)}
+.dt i{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;font-style:normal;line-height:1}
+.dt i span{font-size:26px}.dt i b{font:600 20px var(--f-ui);color:var(--ink-2)}
+.dt i.w{bottom:90px;color:var(--ok);flex-direction:column-reverse}.dt i.u{top:90px;color:var(--high)}
+.dt i.w.r1 b{margin-bottom:28px}.dt i.u.r1 b{margin-top:28px}
+.pgl{display:grid;grid-template-columns:1fr 1fr 1fr;gap:22px}#big.post>.pgl{flex:1 0 auto}
+.pgl .one{font:600 34px/1.22 var(--f-ui);margin-top:16px}
+.pgl ul{list-style:none;display:grid;gap:14px;margin-top:16px;align-content:start}
+.pgl li{font:600 34px/1.2 var(--f-ui)}.pgl li::before{content:"";display:inline-block;width:10px;height:10px;transform:rotate(45deg) translateY(-4px);margin-right:14px;background:var(--bronze-l)}
+.pgl .hl li{font-size:26px;color:var(--ink-2)}
+.pgc{font:600 24px var(--f-ui);color:var(--ink-2)}.pgc b{color:var(--ink)}
+/* map/full/enemies views (analysis; same tokens) */
+#top{display:flex;align-items:center;gap:16px;flex:none;min-height:96px}
+#top .ico{width:56px;height:56px;color:var(--ink-2)}
+#top .w{font:800 40px/1 var(--f-display);color:var(--ink-2)}
+#top .tx{font-size:20px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#top em{margin-left:auto;font-style:normal;color:var(--ink-2);align-self:flex-start}
+#top.info .w,#top.info .ico{color:var(--ink)}
+#top.warn{background:color-mix(in srgb,var(--warn) 22%,var(--s-1));box-shadow:var(--frame),inset 6px 0 0 var(--warn)}#top.warn .w{color:var(--ink)}#top.warn .ico{color:var(--warn)}
+#top.high{background:linear-gradient(180deg,#7a1c18,#3a0f0e);box-shadow:var(--frame),0 0 0 2px #ff4d4f99}#top.high .w,#top.high .ico{color:#fff}
+#flash{position:fixed;inset:0;pointer-events:none;opacity:0;z-index:20}
+#flash.high{background:var(--high);animation:fl .4s ease-out 1}
+@keyframes fl{0%{opacity:.35}100%{opacity:0}}
+#edge{position:fixed;inset:0;pointer-events:none;z-index:19}
+body[data-sev=high] #edge{box-shadow:inset 0 0 0 6px var(--high)}
+/* one-shot onsets; nothing loops */
+.on-fade{animation:fade .25s var(--e-out) 1}@keyframes fade{from{opacity:.3}}
+.on-pulse{animation:bright .6s var(--e-out) 1}@keyframes bright{0%{filter:brightness(1.8)}100%{filter:none}}
+.on-rise{animation:rise .42s var(--e-snap) 1}@keyframes rise{from{opacity:0;transform:translateY(12px) scale(.98)}}
+.ping{animation:ping 1.4s var(--e-out) 3;transform-box:fill-box;transform-origin:center}@keyframes ping{from{transform:scale(.3);opacity:1}to{transform:scale(1.6);opacity:0}}
+body.still *,body.still *::before{animation:none!important;transition:none!important}
+/* map */
+#mapbox{position:relative;width:100%;aspect-ratio:1;overflow:hidden;background:#0c1410;box-shadow:inset 0 0 40px #000;flex:none}
+.panel #mapbox,.col>#mapbox{box-shadow:var(--frame),inset 0 0 40px #000}
+#map{width:100%;height:100%;display:block}
+#banner{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(5,8,12,.72);
+  font:600 32px/1.3 var(--f-ui);color:var(--ink-2);text-align:center;padding:2rem;z-index:2}
+#banner.on{display:flex}
+#inset{position:absolute;right:8px;bottom:8px;width:32%;box-shadow:var(--frame);display:none;background:#000;z-index:1}
+#lineup{display:flex;gap:6px;align-items:center;flex:none}
+.lp{position:relative;flex:1 1 0;min-width:0;aspect-ratio:16/9;overflow:hidden;background:var(--s-2);box-shadow:0 0 0 1px #000}
+.lp img{width:100%;height:100%;object-fit:cover}
+.lp.rad{box-shadow:0 0 0 1px #000,inset 0 -3px 0 var(--ally)}.lp.dire{box-shadow:0 0 0 1px #000,inset 0 -3px 0 var(--enemy)}.lp.mine{box-shadow:0 0 0 2px var(--ink)}
+.lp.dead img{filter:grayscale(1) brightness(.45)}
+.lp span{position:absolute;inset:auto 0 0 0;text-align:center;font-size:16px;font-weight:800;background:rgba(0,0,0,.65)}
+#score{font-size:22px;font-weight:800;padding:0 6px;white-space:nowrap}
+#feed{flex:none}
+#feedl>div{display:flex;gap:10px;align-items:baseline;font-size:20px;padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#feed b{width:10px;height:10px;transform:rotate(45deg);flex:none;align-self:center;background:var(--ink-2)}
+#feed .warn b{background:var(--warn)}#feed .high b{background:var(--high)}#feed .high{font-weight:700}
+#feed em{margin-left:auto;font-style:normal;color:var(--ink-2);font-size:16px;padding-left:8px}
+#adv{flex:none}
+#adv h2{font:700 26px/1.15 var(--f-ui);margin-bottom:6px}
+#adv ul{list-style:none;font-size:20px;display:grid;gap:2px}
+#adv li::before{content:"› ";color:var(--bronze-l)}
+#adv .why{color:var(--ink-2);font-size:16px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.risk-low{color:var(--ink-2)}.risk-med{color:var(--warn)}.risk-high{color:var(--high)}
+#jevp{flex:none}
+.ja{display:flex;align-items:center;gap:12px;font:800 32px/1.1 var(--f-ui)}
+.ja .ico{width:38px;height:38px}.ja .pbar{flex:1;max-width:14rem}.ja small{font-size:16px;color:var(--ink-2);font-weight:600}
+.ji{width:22px;height:16px;border-radius:2px}.jc{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.jc .meter{width:60px;height:10px}
+.pbar{display:inline-block;height:10px;background:#222830;overflow:hidden;vertical-align:middle}.pbar i{display:block;height:100%}
+.it{display:flex;align-items:center;gap:10px;font-size:24px;font-weight:700;padding:4px 0;white-space:nowrap;overflow:hidden}
+.it img{width:58px;height:42px;border-radius:2px;object-fit:cover;background:var(--s-2)}
+.it .c{margin-left:auto;color:var(--gold);font-weight:700}
+.it.aff .c{color:var(--ok)}
+.it.ctr{font-size:20px}.it.ctr img{width:36px;height:36px}
+.tm{display:flex;justify-content:space-between;font-size:20px;padding:2px 0}
+.tm .n{font-weight:800}.tm.soon,.tm.now{color:var(--warn)}.tm.lo{opacity:.45}
+#enemies{flex:1}
+.er{display:grid;grid-template-columns:4.2rem 9rem 5rem 1fr auto;gap:10px;align-items:center;padding:4px 0;border-top:1px solid var(--bronze-d)}
+.er:first-of-type{border-top:0}
+.er img{width:4.2rem;height:2.36rem;object-fit:cover;border-radius:2px}
+.er.dead img{filter:grayscale(1) brightness(.5)} .er.mia img{filter:grayscale(.7)}
+.er .nm{font-weight:700;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st{font-size:16px;font-weight:700}.st.dead{color:var(--ink-3)}.st.mia{color:var(--warn)}.st.vis{color:var(--ink)}
+.wb{height:8px;background:#222830;overflow:hidden}.wb i{display:block;height:100%;background:var(--ink-2)}
+.er .rs{font-size:16px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.er .ci{display:flex;gap:6px;align-items:center;font-size:16px;color:var(--ink-2)}.er .ci img{width:26px;height:26px}
+.tgt{background:var(--high);color:#fff;font-size:14px;padding:0 6px;border-radius:2px;margin-left:6px;vertical-align:middle}
+.tgt.j{background:var(--s-inset);color:var(--ink-2);box-shadow:inset 0 0 0 1px var(--bronze)}
+#v-enemies .er{grid-template-columns:7rem 13rem 8rem 1fr auto;padding:12px 0;gap:16px}
+#v-enemies .er img{width:7rem;height:3.94rem}#v-enemies .er .nm{font-size:24px}#v-enemies .st{font-size:18px}
+#v-enemies .er .rs{font-size:18px;white-space:normal}#v-enemies .wb{height:12px}#v-enemies .er .ci{font-size:16px}#v-enemies .er .ci img{width:36px;height:36px}
+#v-enemies .it{font-size:28px;padding:5px 0}#v-enemies .it img{width:67px;height:48px}
+/* settings drawer */
+.cmd{text-transform:none;letter-spacing:0;display:inline-flex;align-items:stretch;margin-top:14px;padding:0;cursor:pointer;vertical-align:middle;border:0;background:var(--s-inset);
+  box-shadow:inset 0 2px 6px #000,0 0 0 1px #000,0 0 0 2px var(--bronze-l,#b08d57);transition:box-shadow .15s}
+.cmd code{font:600 20px/1 ui-monospace,Menlo,monospace;color:#ffd24a;padding:9px 14px;letter-spacing:.01em}
+.cmd .q{display:grid;place-items:center;width:38px;font:800 18px/1 var(--f-display);color:#000;background:linear-gradient(var(--bronze-l,#b08d57),#7a5f36)}
+.cmd:hover,.cmd:focus-visible{outline:0;box-shadow:inset 0 2px 6px #000,0 0 0 1px #000,0 0 0 2px #ffd24a,0 0 18px rgba(255,210,74,.35)}
+.cmd .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}   /* scoped: a bare .sr also hid the header's right group (gear, toast, chips) */
+.copy{text-transform:none;margin-left:10px;font:700 18px/1 var(--f-ui);padding:6px 12px;vertical-align:middle;cursor:pointer}
+#help{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(0,0,0,.72)}
+#help[hidden]{display:none}
+#help .box{width:min(1100px,92vw);max-height:90vh;overflow:auto;padding:28px 34px;background:linear-gradient(var(--s-2),var(--s-1));box-shadow:0 0 0 1px #000,0 0 0 2px var(--bronze-l,#b08d57),0 20px 60px #000}
+#help h2{font:700 34px/1.2 var(--f-display);letter-spacing:.06em;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center}
+#help ol{list-style:none;counter-reset:st;display:flex;flex-direction:column;gap:22px}
+#help li{counter-increment:st;display:grid;grid-template-columns:52px 1fr;gap:8px 16px;font:500 24px/1.35 var(--f-ui);color:var(--ink-2)}
+#help li::before{content:counter(st);grid-row:span 2;display:grid;place-items:center;width:44px;height:44px;border-radius:50%;font:800 24px/1 var(--f-display);color:#000;background:var(--bronze-l,#b08d57)}
+#help li b{color:var(--ink)}#help code{font:700 24px/1 ui-monospace,Menlo,monospace;color:#ffd24a;background:var(--s-inset);padding:3px 8px}
+#help li img{max-width:100%;max-height:44vh;justify-self:start;box-shadow:0 0 0 1px #000,0 0 0 2px var(--s-3)}
+#help .x{font-size:22px;padding:8px 16px}
+#drawer{position:fixed;top:var(--strip);right:0;bottom:0;width:min(600px,42vw);z-index:40;overflow:auto;padding:22px 26px;display:flex;flex-direction:column;gap:22px;
+  background:var(--grain),var(--panel-grad);box-shadow:-2px 0 0 var(--bronze-d),-24px 0 48px rgba(0,0,0,.7)}
+#drawer .dr{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+#drawer .dl{font:600 18px var(--f-ui);color:var(--ink-2)}
+#drawer input{font:700 18px var(--f-ui);color:var(--ink);background:var(--s-inset);border:0;box-shadow:inset 0 0 0 1px var(--bronze);padding:11px 12px;width:12rem;border-radius:2px}
+#drawer .kn{min-width:6rem}
+#drawer input[type=range]{flex:1;min-width:8rem;width:auto;height:44px;padding:0;box-shadow:none;background:none;accent-color:var(--bronze-l);cursor:pointer}
+#verb{gap:6px}#verb button{flex:1}
+#dev>section{margin-top:22px}
+#dev>summary{cursor:pointer;list-style:none}#dev>summary::-webkit-details-marker{display:none}
+#dev>summary::before{content:"▸"}#dev[open]>summary::before{content:"▾"}
+#roles button{min-width:52px}
+#src{display:grid;gap:8px;margin-top:12px;font-size:18px}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block;background:var(--ink-3)}
+.dot.g{background:var(--ok)}.dot.a{background:var(--warn)}.dot.r{background:var(--high)}.dot.o{background:var(--ink-3)}.dot.busy{background:var(--ink)}
+#rec{font-size:18px;color:var(--ink-2)}
+#talkPop{position:fixed;right:var(--gap);bottom:var(--gap);width:var(--mapw);z-index:30;padding:18px 22px;pointer-events:none;
+  background:var(--grain),var(--panel-grad);box-shadow:var(--frame),var(--bevel),var(--lift),inset 0 3px 0 var(--bronze-l)}
+#talkPop .ts{font:700 16px/1 var(--f-display);letter-spacing:.12em;color:var(--ink-2);text-transform:uppercase}
+#talkPop .th{font:600 24px/1.25 var(--f-ui);color:var(--ink-2);margin-top:10px}#talkPop .tr{font:700 26px/1.25 var(--f-ui);color:var(--ink);margin-top:10px}
+#err{position:fixed;left:8px;bottom:8px;color:var(--high);font-size:16px;max-width:50vw;z-index:30}
+/* svg map */
+.lane{fill:none;stroke:#2c3528;stroke-width:22;stroke-linecap:round;stroke-linejoin:round}
+.river{fill:none;stroke:#1a3550;stroke-width:46;stroke-linecap:round}
+.u text{font:700 28px "Barlow Semi Condensed","Avenir Next Condensed",sans-serif;text-anchor:middle;paint-order:stroke;stroke:#000;stroke-width:6;fill:var(--ink)}
+.u .ring{fill:#0b0f14;stroke-width:5}
+.u.ally .ring{stroke:var(--ally)}.u.enemy .ring{stroke:var(--enemy)}
+.u.me .ring{stroke:var(--ink);stroke-width:8}.u.me .halo{fill:none;stroke:var(--ink);stroke-width:2;opacity:.45}
+.u.ghost image{filter:grayscale(1);opacity:.42}.u.ghost .ring{stroke:var(--ink-3);stroke-dasharray:6 5;fill:#0b0f14aa}
+.u.ghost text{fill:var(--warn)}
+.reach{fill:rgba(255,176,46,.04);stroke:none}
+body[data-sc=dead] #reach{display:none}
+.pit circle{stroke-width:5}.pit text{font:800 30px "Barlow Semi Condensed",sans-serif;text-anchor:middle;fill:var(--ink);paint-order:stroke;stroke:#000;stroke-width:6}
+</style>
+</head>
+<body data-att="none" data-sev="calm">
+<header id="strip">
+  <div class="sl"><i id="logo" class="dsym" role="img" aria-label="Dota 2"></i><b id="brand">FOGWATCH</b><span id="me"></span><span id="goal"></span></div>
+  <div class="sc"><span id="clock">--:--</span><span id="dn"></span><span id="phase"></span><span id="flags"></span></div>
+  <div class="sr"><span id="toast"></span><span id="exc"></span><span id="health"></span><button id="pgBan" hidden>Report</button><button id="gear" aria-expanded="false" aria-label="settings"></button></div>
+</header>
+<main>
+  <section class="view" id="v-auto">
+    <div id="play">
+      <div id="left">
+        <div id="pc" class="pn"></div>
+        <div id="s1" class="pn slot"></div><div id="s2" class="pn slot"></div><div id="s3" class="pn slot"></div>
+        <div id="b1" class="pn slot"></div><div id="b2" class="pn slot"></div><div id="b3" class="pn slot"></div><div id="b4" class="pn slot"></div>
+        <div id="deadc"><div id="d1" class="pn"></div><div id="d0" class="pn"></div><div id="d2" class="pn"></div><div id="d3" class="pn"></div></div>
+      </div>
+      <div id="right"><div id="mapslot" class="pn"><i hidden data-p="mapbox"></i></div><div id="cue" class="pn"></div></div>
+    </div>
+    <div id="big" hidden></div>
+  </section>
+  <section class="view" id="v-map"><div class="col mapcol"><i hidden data-p="mapbox"></i></div>
+    <div class="col" style="flex:1"><i hidden data-p="lineup"></i><i hidden data-p="top"></i><i hidden data-p="feed"></i><i hidden data-p="jevp"></i><i hidden data-p="adv"></i><i hidden data-p="timers"></i></div></section>
+  <section class="view" id="v-full"><div class="col mapcol"><i hidden data-p="mapbox"></i><i hidden data-p="lineup"></i></div>
+    <div class="col" style="flex:1"><i hidden data-p="top"></i><i hidden data-p="feed"></i>
+      <div class="row"><i hidden data-p="jevp"></i><i hidden data-p="adv"></i></div><div class="row"><i hidden data-p="items"></i><i hidden data-p="timers"></i></div><i hidden data-p="enemies"></i></div></section>
+  <section class="view" id="v-enemies"><div class="col" style="flex:1.5"><i hidden data-p="enemies"></i></div>
+    <div class="col" style="flex:1"><i hidden data-p="top"></i><i hidden data-p="jevp"></i><i hidden data-p="items"></i></div></section>
+</main>
+<div id="pool" hidden>
+  <div id="mapbox">
+    <svg id="map" viewBox="0 0 1000 1000">
+      <defs><radialGradient id="rb"><stop offset="0" stop-color="#2f5a22" stop-opacity=".6"/><stop offset="1" stop-color="#2f5a22" stop-opacity="0"/></radialGradient>
+        <radialGradient id="db"><stop offset="0" stop-color="#6a1d16" stop-opacity=".6"/><stop offset="1" stop-color="#6a1d16" stop-opacity="0"/></radialGradient></defs>
+      <rect width="1000" height="1000" fill="#0c1410"/>
+      <circle cx="130" cy="870" r="230" fill="url(#rb)"/><circle cx="870" cy="130" r="230" fill="url(#db)"/>
+      <path class="river" d="M0 330C250 380 400 450 500 500S750 620 1000 670"/>
+      <path class="lane" d="M120 860V150Q120 120 150 120H860"/>
+      <path class="lane" d="M155 845L845 155"/>
+      <path class="lane" d="M140 880H850Q880 880 880 850V140"/>
+      <image href="/map.png" x="-70.6" y="-70.6" width="1141.2" height="1141.2" preserveAspectRatio="none" onerror="this.remove()"/>
+      <g id="towers" fill="#2c333c"></g>
+      <rect x="100" y="830" width="60" height="60" rx="6" fill="#2f5a22"/><rect x="840" y="110" width="60" height="60" rx="6" fill="#6a1d16"/>
+      <g id="pits"></g><g id="reach"></g><g id="units"></g><g id="pings"></g>
+    </svg>
+    <img id="inset" alt="raw minimap unavailable">
+    <div id="banner">Waiting for game…</div>
+  </div>
+  <div id="lineup"></div>
+  <div id="top" class="panel none"></div>
+  <div id="feed" class="panel"><div class="ttl">Alerts</div><div id="feedl"></div></div>
+  <div id="jevp" class="panel"></div>
+  <div id="adv" class="panel"></div>
+  <div id="items" class="panel"></div>
+  <div id="timers" class="panel"></div>
+  <div id="enemies" class="panel"></div>
+</div>
+<div id="help" hidden role="dialog" aria-modal="true" aria-label="Set up Dota game data"><div class="box">
+  <h2>Connect the coach to Dota 2 <button class="x" data-help-close>Close ✕</button></h2>
+  <ol>
+    <li><span>Open <b>Steam → Library</b>, right-click <b>Dota 2</b> and choose <b>Properties…</b></span><img src="/img/setup/step1.png" alt="" onerror="this.remove()"></li>
+    <li><span>On the <b>General</b> tab find <b>Launch Options</b> and type <code>-gamestateintegration</code><button class="copy" data-copy>Copy</button> (keep anything already there, separated by a space).</span><img src="/img/setup/step2.png" alt="" onerror="this.remove()"></li>
+    <li><span>Close the window and start Dota 2. The waiting screen switches to the draft as soon as the game sends data. The coach's config file is already installed on this Mac (<code>uv run tools.py install-gsi</code> re-installs it).</span><img src="/img/setup/step3.png" alt="" onerror="this.remove()"></li>
+  </ol>
+</div></div>
+<aside id="drawer" hidden>
+  <section><div class="lab">Coach voice</div>
+    <div class="dr" id="verb"><button data-verb="low">Quiet</button><button data-verb="normal">Normal</button><button data-verb="high">Talkative</button></div>
+    <div class="dr"><span id="verbNote" class="dl"></span></div>
+    <div class="dr"><label class="dl" for="vol">Volume</label><input id="vol" type="range" min="0" max="1" step="0.05" value="1"></div>
+    <div class="dr"><button id="voiceBtn"></button><button data-voice-test>Test voice</button><button id="ovBtn"></button></div></section>
+  <section><div class="lab">AI coach (optional, your own API keys)</div>
+    <div class="dr"><button id="aiBtn"></button><span id="aiNote" class="dl"></span></div>
+    <div class="dr"><span class="dl">The enemy radar, alerts and minimap reading are free and always on. AI adds the game plan and advice (OpenAI), quick decisions (Jev) and talking to the coach. The post-game review runs whenever an Anthropic key is set.</span></div>
+    <div class="dr"><span class="dl kn">OpenAI</span><input id="k_openai" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…" aria-label="OpenAI API key"><span class="dl" id="ks_openai"></span></div>
+    <div class="dr"><span class="dl kn">Jev</span><input id="k_jev" type="password" autocomplete="off" spellcheck="false" placeholder="console.typesafe.ai" aria-label="Jev API key"><span class="dl" id="ks_jev"></span></div>
+    <div class="dr"><span class="dl kn">Anthropic</span><input id="k_anthropic" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" aria-label="Anthropic API key"><span class="dl" id="ks_anthropic"></span></div>
+    <div class="dr"><button id="keySave">Save keys</button><span class="dl">Saved only on this computer (live-coach/.env).</span></div></section>
+  <section><div class="lab">Talk to the coach (key M mutes the mic)</div>
+    <div class="dr"><button id="micMode"></button><button id="micMute"></button></div>
+    <div class="dr" id="keyRow"><span class="dl">Talk key</span><input id="micKeyIn" spellcheck="false" autocomplete="off" aria-label="push-to-talk key"><button id="micKey">Set key</button></div>
+    <div class="dr"><span class="dl">mouse3 / mouse4 / mouse5, f1-f20, a letter; optional ctrl+ alt+ shift+ cmd+</span></div></section>
+  <section><div class="lab">Role and mode</div>
+    <div class="dr"><span id="roleLbl" class="dl">Role</span></div>
+    <div class="dr" id="roles"><button class="rb">A</button><button class="rb">1</button><button class="rb">2</button><button class="rb">3</button><button class="rb">4</button><button class="rb">5</button></div>
+    <div class="dr"><button id="turbo">Turbo</button></div></section>
+  <section><div class="lab">Feedback on the last call (keys G / B)</div>
+    <div class="dr"><button class="fb" data-fb="good">Good call</button><button class="fb" data-fb="bad">Bad call</button><span id="marks" class="dl"></span></div></section>
+  <section><div class="lab">This screen</div>
+    <div class="dr"><button id="soundBtn"></button><button id="motionBtn"></button></div></section>
+  <details id="dev"><summary class="lab">Developer</summary>
+    <section><div class="lab">View (keys 0-4)</div>
+      <div class="dr" id="tabs"><button class="tab" data-v="auto">Auto</button><button class="tab" data-v="glance">1 Glance</button><button class="tab" data-v="map">2 Map</button><button class="tab" data-v="full">3 Full</button><button class="tab" data-v="enemies">4 Enemies</button></div></section>
+    <section><div class="lab">Setup</div>
+      <div class="dr"><button data-post="/api/calibrate">Calibrate</button><button data-post="/api/mark?name=rosh_top">Rosh top</button><button data-post="/api/mark?name=rosh_bot">Rosh bot</button><button id="insetBtn">Minimap</button></div></section>
+    <section><div class="lab">Recording</div><div class="dr" id="rec"></div></section>
+    <section><div class="lab">Sources</div><div id="src"></div></section>
+  </details>
+</aside>
+<div id="talkPop" hidden></div><div id="edge"></div><div id="flash"></div><div id="err"></div>
+<script>
+'use strict';
+const $ = id => document.getElementById(id), NS = 'http://www.w3.org/2000/svg', Q = new URLSearchParams(location.search), MOCK = Q.has('mock');
+const CDN = 'https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/';
+const icon = h => `${CDN}heroes/icons/${h}.png`, portrait = h => `${CDN}heroes/${h}.png`, itemImg = k => `${CDN}items/${itemKey(k)}.png`;
+const RANK = {high: 3, warn: 2, info: 1}, LEVELS = ['info', 'warn', 'high'];
+const NAMES = {zuus: 'Zeus', necrolyte: 'Necrophos', nevermore: 'Shadow Fiend', furion: "Nature's Prophet", obsidian_destroyer: 'Outworld Destroyer',
+  wisp: 'Io', skeleton_king: 'Wraith King', rattletrap: 'Clockwerk', magnataur: 'Magnus', doom_bringer: 'Doom', abyssal_underlord: 'Underlord',
+  queenofpain: 'Queen of Pain', windrunner: 'Windranger', life_stealer: 'Lifestealer', shredder: 'Timbersaw', antimage: 'Anti-Mage',
+  vengefulspirit: 'Vengeful Spirit', centaur: 'Centaur Warrunner', treant: 'Treant Protector', phantom_assassin: 'Phantom Assassin'};
+// Jev action enum -> glance word + icon (fallback when W.glance.action is missing)
+const ACT = {farm_lane: ['FARM', 'farm'], farm_jungle: ['JUNGLE', 'farm'], gank: ['GANK', 'target'], group: ['GROUP', 'fight'], push: ['PUSH', 'push'],
+  defend: ['DEFEND', 'push'], take_objective: ['OBJECTIVE', 'push'], roshan: ['ROSH', 'rosh'], stack_pull: ['STACK', 'stack'], ward: ['WARD', 'ward'],
+  retreat: ['BACK', 'back'], heal_base: ['HEAL', 'back']};
+const DWORD = ['SAFE', 'LOW', 'RISKY', 'HIGH', 'DEADLY'];
+const dlev = d => !num(d) ? '' : d >= 3 ? 'high' : d >= 2 ? 'warn' : '';   // one colour per danger level: 0-1 ink, 2 warn, 3-4 high
+// Bold single-colour 24px glyphs; K = black detail. ponytail: duplicated in overlay.html (no shared static route), keep in sync
+const S = 'fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"', F = 'fill="currentColor"',
+  K = 'fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round"', KF = 'fill="#000"';
+const ICONS = {
+  danger: `<path ${F} d="M12 1.5 23.2 21.5H.8z"/><path ${K} d="M12 8.5v6M12 18v.2"/>`,
+  smoke: `<path ${F} d="M6.5 20h11a4.5 4.5 0 0 0 .8-8.93A6.5 6.5 0 0 0 5.6 9.6 5.2 5.2 0 0 0 6.5 20z"/>`,
+  rosh: `<path ${S} d="M3 2.5c0 5 2 7.5 5.5 7.5M21 2.5c0 5-2 7.5-5.5 7.5"/><circle ${F} cx="12" cy="14.5" r="7.5"/><circle ${KF} cx="9" cy="13.5" r="1.6"/><circle ${KF} cx="15" cy="13.5" r="1.6"/><path ${K} d="M9.5 18.5h5"/>`,
+  missing: `<path ${S} d="M1.8 12S5.6 5 12 5s10.2 7 10.2 7-3.8 7-10.2 7S1.8 12 1.8 12z"/><circle ${F} cx="12" cy="12" r="3"/><path ${S} d="M3.5 21 20.5 3"/>`,
+  back: `<path ${S} stroke-width="3" d="M10 4 4 10l6 6M4 10h10a6 6 0 0 1 6 6v4"/>`,
+  buyback: `<path ${S} d="M20.5 12A8.5 8.5 0 1 1 18 6M20.5 2.5v4.5H16"/><circle ${F} cx="12" cy="12" r="3.5"/>`,
+  item: `<path ${S} d="M8.5 8V6a3.5 3.5 0 0 1 7 0v2"/><path ${F} d="M4 8h16l-1.6 13.5H5.6z"/>`,
+  rune: `<path ${F} d="M12 1.5 20.5 12 12 22.5 3.5 12z"/><path ${K} d="M12 6.5 16 12l-4 5.5"/>`,
+  stack: `<path ${F} d="M12 2.5 22 7.5 12 12.5 2 7.5z"/><path ${S} d="M2 12l10 5 10-5M2 16.5l10 5 10-5"/>`,
+  night: `<path ${F} d="M20.5 15.2A9.2 9.2 0 0 1 8.8 3.5a9.2 9.2 0 1 0 11.7 11.7z"/>`,
+  day: `<circle ${F} cx="12" cy="12" r="5"/><path ${S} d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/>`,
+  dead: `<path ${F} d="M12 1.5a9.5 9.5 0 0 0-9.5 9.5c0 3.2 1.6 5.4 3.8 6.7v4.8h11.4v-4.8c2.2-1.3 3.8-3.5 3.8-6.7A9.5 9.5 0 0 0 12 1.5z"/><circle ${KF} cx="8.4" cy="11" r="2.3"/><circle ${KF} cx="15.6" cy="11" r="2.3"/><path ${K} d="M10 19.5v2M14 19.5v2"/>`,
+  fight: `<path ${S} stroke-width="2.8" d="M4 3l12 12M20 3 8 15M13 18l5-5M6 13l5 5M17.5 17.5l3 3M6.5 17.5l-3 3"/>`,
+  push: `<path ${S} stroke-width="3.2" d="M4.5 12 12 4.5l7.5 7.5M4.5 20 12 12.5l7.5 7.5"/>`,
+  farm: `<ellipse ${F} cx="12" cy="5.5" rx="8.5" ry="3.5"/><path ${S} d="M3.5 10c0 1.9 3.8 3.5 8.5 3.5s8.5-1.6 8.5-3.5M3.5 14.5c0 1.9 3.8 3.5 8.5 3.5s8.5-1.6 8.5-3.5M3.5 19c0 1.9 3.8 3.5 8.5 3.5s8.5-1.6 8.5-3.5"/>`,
+  ward: `<path ${F} d="M1 12S5 4.5 12 4.5 23 12 23 12s-4 7.5-11 7.5S1 12 1 12z"/><circle ${KF} cx="12" cy="12" r="3.6"/>`,
+  target: `<circle ${S} cx="12" cy="12" r="8"/><path ${S} d="M12 1v5.5M12 17.5V23M1 12h5.5M17.5 12H23"/><circle ${F} cx="12" cy="12" r="2.2"/>`,
+  ok: `<path ${S} stroke-width="3.4" d="M3.5 12.5l5.5 5.5L20.5 6"/>`,
+  x: `<path ${S} stroke-width="3.4" d="M5 5l14 14M19 5 5 19"/>`,
+  skill: `<path ${F} d="M12 1.5 21.5 11.5H15.5v11h-7v-11H2.5z"/>`,
+  gear: `<path ${S} d="M3 6h18M3 12h18M3 18h18"/><circle ${F} cx="8" cy="6" r="2.6"/><circle ${F} cx="16" cy="12" r="2.6"/><circle ${F} cx="10" cy="18" r="2.6"/>`};
+const ico = (n, style = '') => `<svg class="ico" viewBox="0 0 24 24" style="${style}">${ICONS[n] || ICONS.danger}</svg>`;
+let W = {}, lastMsg = 0, sseDown = false, firstRender = true, lastSeq = null, lastLv = 'none', view = 'auto';
+
+const short = s => String(s ?? '').replace(/^npc_dota_hero_/, '');
+const pretty = h => NAMES[h] || h.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+const num = v => typeof v === 'number' && Number.isFinite(v);
+const pc = p => num(p) ? `${Math.round(p * 100)}%` : '';
+const fmt = s => num(s) ? `${s < 0 ? '-' : ''}${Math.floor(Math.abs(s) / 60)}:${String(Math.floor(Math.abs(s) % 60)).padStart(2, '0')}` : '--:--';
+const xy = p => Array.isArray(p) ? p : p && typeof p === 'object' ? [p.x, p.y] : [];
+const sv = (x, y) => [(x + 8300) / 16600 * 1000, (8300 - y) / 16600 * 1000];
+const set = (el, html) => { if (el._h !== html) { el.innerHTML = html; el._h = html; } };   // ponytail: innerHTML diff per panel, keyed DOM if images flicker
+// `at`-style stamps are either epoch seconds (compare to W.t) or game clock seconds (compare to clock).
+const now = () => num(W.t) ? W.t : Date.now() / 1000;
+const since = at => !num(at) ? null : Math.max(0, (at > 1e8 ? now() : (W.game?.clock ?? 0)) - at);
+const until = at => !num(at) ? null : at - (at > 1e8 ? now() : (W.game?.clock ?? 0));
+const ago = s => s == null ? '' : s < 60 ? `${Math.round(s)}s` : `${Math.round(s / 60)}m`;
+const itemKey = n => String(n).toLowerCase().replace(/^item_/, '').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+const itemName = n => /[A-Z ]/.test(n) ? n : pretty(itemKey(n));
+const imgTag = (src, cls = '') => `<img class="${cls}" src="${esc(src)}" loading="lazy" onerror="this.style.visibility='hidden'">`;
+const pbar = (p, col = 'var(--ink-2)') => `<span class="pbar"><i style="width:${num(p) ? Math.round(Math.max(0, Math.min(1, p)) * 100) : 0}%;background:${col}"></i></span>`;
+const meter = d => `<span class="meter ${dlev(d)}">${[1, 2, 3, 4].map(i => `<i class="${num(d) && i <= d ? 'on' : ''}"></i>`).join('')}</span>`;
+const fit = (w, n) => Math.min(1, n / Math.max(1, String(w).length)).toFixed(2);   // shrink long words to fit their box
+const obj = v => v && typeof v === 'object' && !Array.isArray(v) ? v : null;
+// Player-facing text never shows a model name or a probability ("Jev: retreat 68%" -> "retreat")
+const clean = t => String(t ?? '').replace(/\bjev\b:?\s*/gi, '').replace(/\s*\(?\b\d+(\.\d+)?\s?%\)?/g, '').replace(/\s{2,}/g, ' ').trim();
+
+// ---- coach v2 state (W.goal / W.coach / W.settings). Every field may be missing on an older server. -----------------
+const goal = () => { const g = obj(W.goal); return g && num(g.target) ? g : null; };
+const verbosity = () => W.settings?.verbosity || obj(W.coach)?.verbosity || 'normal';
+const tempQuiet = () => (obj(W.coach)?.quiet ?? W.settings?.quiet) === true;   // "quiet" by voice: lasts until the next match
+const quiet = () => tempQuiet() || verbosity() === 'low';
+const volume = () => num(W.settings?.volume) ? W.settings.volume : num(obj(W.coach)?.volume) ? W.coach.volume : 1;
+const goalCls = g => !num(g.now) ? '' : g.now > g.target ? 'high' : g.now === g.target ? 'warn' : '';   // amber at the limit, red over it
+const DIRT = {river: 'from the river', jungle: 'from the jungle', behind: 'behind you'};   // alerts[].dir on a gank call
+
+// derived summaries (backend W.glance first, local fallbacks so v1 servers still render)
+// the launch option as a clickable "command chip" (opens the setup popup); shown only when Dota runs without sending data
+const CMD = '-gamestateintegration';
+const cmdChip = () => `<button class="cmd" data-help title="How to add this launch option in Steam"><code>${CMD}</code><span class="q" aria-hidden="true">?</span><span class="sr">how to set this up</span></button>`;
+function waitState() {   // the honest state line: {tone: '' neutral | 'act' needs the player | 'ok' ready, text, chip}
+  if (sseDown || Date.now() - lastMsg > 6000) return {tone: '', text: 'Coach server offline. Reconnecting…'};
+  const r = obj(obj(W.ready)?.gsi), gs = W.src_age?.gsi_s;
+  if (r?.text) return {tone: r.ok === true ? 'ok' : r.ok === false ? 'act' : '', text: String(r.text), chip: r.ok === false};
+  // older server: it cannot tell a closed game from a missing launch option, so the chip stays next to a neutral line
+  return !num(gs) ? {tone: '', text: W.game?.state ? 'Waiting for game data…' : 'Waiting for Dota. Start it with', chip: !W.game?.state}
+    : gs > 10 ? {tone: 'act', text: `Game data stopped ${ago(gs)} ago`} : {tone: 'ok', text: W.game?.state ? 'Between games' : 'Ready'};
+}
+function waitMsg() {
+  const gs = W.src_age?.gsi_s;
+  return sseDown || Date.now() - lastMsg > 6000 ? 'Coach server offline — reconnecting…' : !W.game?.state ? 'Waiting for game — start Dota with -gamestateintegration'
+    : !num(gs) ? 'Waiting for GSI…' : gs > 10 ? `GSI disconnected — last update ${ago(gs)} ago` : '';
+}
+function glance() {
+  const g = W.glance && typeof W.glance === 'object' ? W.glance : {}, d = W.decision || {};
+  const ni = W.advice?.next_items?.[0], nt = timersList().find(t => t.s > 0 && !minor(t.name));
+  const a = d.action?.choice ? {word: (ACT[d.action.choice] || [d.action.choice.toUpperCase()])[0], icon: (ACT[d.action.choice] || [, 'ok'])[1], p: d.action.p} : null;
+  const act = 'action' in g ? g.action : a;   // the model's word only when it is sure (>= 0.6); otherwise the card shows the phase default
+  return {next_item: 'next_item' in g ? g.next_item : ni && typeof ni === 'object' ? ni : null,
+    next_timer: Array.isArray(W.timers) ? nt || null : g.next_timer ?? null,
+    mia: num(g.mia) ? g.mia : heroesList().filter(h => h.ally === false && !h.dead && !h.visible && num(h.mia_s) && h.mia_s >= 8).length,
+    danger: num(g.danger) ? g.danger : num(d.danger?.score) ? Math.round(d.danger.score) : null,
+    action: obj(act) && act.word && !(num(act.p) && act.p < .6) ? act : null, rosh: g.rosh ?? W.obj?.rosh?.state ?? null};
+}
+const phaseAct = () => phase() === 'late' ? {word: 'GROUP', icon: 'fight'} : {word: 'FARM', icon: 'farm'};
+const GUESS = /^R[23]$/;   // missing / smoke are guesses: amber on screen, never red (they arrive as level info; an older server may still send warn/high)
+function attention() {
+  const a = obj(W.attention) || {}, id = String(a.id ?? ''), rule = id.split(':')[0];
+  const lv = !LEVELS.includes(a.level) ? 'none' : GUESS.test(rule) ? 'warn' : a.level;
+  const off = (id.startsWith('T:') && !relevant(id.split(':')[1])) || id.startsWith('check:');   // e.g. a STACK timer in late game; CHECK ITEMS is gone
+  return {...a, rule, lv: lv !== 'none' && a.sticky !== false && !off ? lv : 'none'};
+}
+
+// ---- game phase / timer relevance (all views) -----------------------------------------------------------------------
+const isTurbo = () => W.game?.mode ? W.game.mode === 'turbo' : !!W.settings?.turbo;   // W.game.mode = effective (auto-detected or manual)
+const RW = () => isTurbo() ? [240, 330] : [480, 660];   // Roshan respawn window after a kill. ponytail: turbo halved (guess); server state wins
+const phase = () => { const c = W.game?.clock, t = isTurbo(); return !num(c) || c < (t ? 300 : 600) ? 'laning' : c >= (t ? 900 : 1800) ? 'late' : 'mid'; };
+const relevant = name => !(phase() === 'late' && /^(Stack|Lotus|Bounty runes|Water rune)$/.test(name));   // late: lane economy is noise
+const minor = name => phase() !== 'laning' && /^(Stack|Lotus|Wisdom shrine)$/.test(name);                  // after laning: listed, dimmed
+const tIcon = n => /rune/i.test(n) ? 'rune' : /^Stack/.test(n) ? 'stack' : /Day|Night/.test(n) ? 'night' : /Lotus/.test(n) ? 'farm' : /Wisdom/.test(n) ? 'skill' : 'rune';
+function timersList() {
+  const c = W.game?.clock;
+  return (Array.isArray(W.timers) ? W.timers : []).filter(t => t && t.name && relevant(t.name))
+    .map(t => ({...t, s: num(t.at_clock) && num(c) ? t.at_clock - c : t.in_s})).filter(t => num(t.s)).sort((a, b) => a.s - b.s);
+}
+function liveAlerts() {
+  return (Array.isArray(W.alerts) ? W.alerts : []).filter(a => a && a.text)
+    .map(a => ({...a, age: since(a.at), rule: a.rule || String(a.id ?? '').split(':')[0]})).map(a => ({...a, level: GUESS.test(a.rule) ? 'warn' : RANK[a.level] ? a.level : 'info'}))
+    .filter(a => !(num(a.ttl) && a.age != null && a.age > a.ttl) && !(String(a.id).startsWith('T:') && !relevant(String(a.id).split(':')[1])));
+}
+const defendAlert = () => liveAlerts().filter(x => x.rule === 'R10').sort((x, y) => RANK[y.level] - RANK[x.level])[0];
+function bb() {   // buyback status
+  const m = W.me || {};
+  if (!num(m.buyback_cost)) return null;
+  if (num(m.buyback_cd) && m.buyback_cd > 0) return {cd: true, word: 'CD', s: 'cooldown ' + fmt(m.buyback_cd)};
+  const need = m.buyback_cost - (num(m.gold) ? m.gold : 0);
+  return need <= 0 ? {ok: true, word: 'YES', s: `${m.buyback_cost} of ${m.gold}g`} : {word: 'NO', s: `need ${need}g more`};
+}
+// Skill points: W.skill {points, next:{name,label,slot,img}, then:[...]}; talents have no icon
+const skill = () => W.skill && typeof W.skill === 'object' && num(W.skill.points) && W.skill.points > 0 && W.skill.next ? W.skill : null;
+const isTalent = a => a?.slot === 'talent' || /^special_bonus/.test(String(a?.name ?? ''));
+const abImg = (a, cls = '') => isTalent(a) ? `<span class="tal ${cls}">TALENT</span>` : imgTag(a.img || `${CDN}abilities/${a.name}.png`, cls);
+function nearEnemies(r = 1500) {
+  const m = W.me || {};
+  return !num(m.x) || !num(m.y) ? 0 : heroesList().filter(h => h.ally === false && h.visible && !h.dead && num(h.x) && num(h.y) && Math.hypot(h.x - m.x, h.y - m.y) <= r).length;
+}
+function windowCue() {   // late game: who is dead -> push / defend
+  if (phase() !== 'late') return null;
+  const hs = heroesList(), ed = hs.filter(h => h.ally === false && h.dead), ad = hs.filter(h => h.ally === true && h.dead);
+  const mn = l => Math.round(Math.min(...l.map(h => num(h.respawn_s) ? h.respawn_s : 99)));
+  return ed.length >= 2 && ed.length > ad.length ? {word: 'PUSH', ok: true, s: `${ed.length} enemies dead · ${mn(ed)}s`}
+    : ad.length >= 2 && ad.length > ed.length ? {word: 'DEFEND', s: `${ad.length} allies dead · ${mn(ad)}s`} : null;
+}
+
+// ---- scenario (Auto view) -----------------------------------------------------------------------------------------
+const SCN = {wait: 'WAITING', draft: 'DRAFT', post: 'MATCH ENDED', laning: 'LANING', mid: 'MID GAME', late: 'LATE GAME', fight: 'FIGHT', dead: 'DEAD', rosh: 'ROSHAN'};
+function rawScenario() {
+  const st = String(W.game?.state ?? ''), a = attention(), g = glance(), al = liveAlerts(), c = W.game?.clock, r = W.obj?.rosh || {};
+  if (sseDown || Date.now() - lastMsg > 6000) return 'wait';
+  if (/HERO_SELECTION|STRATEGY_TIME/.test(st)) return 'draft';
+  if (W.postgame || /POST_GAME/.test(st)) return 'post';
+  if (!/PRE_GAME|GAME_IN_PROGRESS|TEAM_SHOWCASE|WAIT_FOR_MAP|WAIT_FOR_PLAYERS/.test(st) || waitMsg()) return 'wait';   // loading/showcase = pre-horn
+  if (W.me?.alive === false) return 'dead';
+  const rules = new Set(al.map(x => x.rule));
+  if ((a.lv === 'high' && !['R4', 'R5'].includes(a.rule)) || rules.has('R1') || rules.has('R3') || al.some(x => x.rule === 'R10' && x.level === 'high')
+    || (num(g.danger) && g.danger >= 3) || nearEnemies() >= (phase() === 'laning' ? 3 : 2)) return 'fight';   // laning: 2 lane opponents are normal
+  if (rules.has('R4') || r.state === 'maybe' || W.decision?.rosh_taken?.p >= .6
+    || (r.state === 'alive' && num(r.killed_at) && num(c) && r.killed_at < 1e8 && c - r.killed_at < RW()[1] + 120)) return 'rosh';
+  return phase();
+}
+// Hysteresis: a downgrade must hold HOLD ms and FIGHT/ROSH stay at least MIN ms; escalation to FIGHT/DEAD and leaving WAIT/DRAFT/DEAD are instant.
+const HOLD = 1500, MIN = 2000;   // was 3.5 s / 4 s: the screen read as old data after a fight ended (player, 2026-11-12)
+let sc = null, scCand = null, scSince = 0, scAt = 0;
+function scenario() {
+  const raw = rawScenario(), t = Date.now();
+  if (raw === sc) { scCand = null; return sc; }
+  if (sc == null || ['fight', 'dead'].includes(raw) || ['wait', 'draft', 'dead'].includes(sc)) { sc = raw; scCand = null; scAt = t; return sc; }
+  if (raw !== scCand) { scCand = raw; scSince = t; }
+  if (t - scSince >= HOLD && t - scAt >= MIN) { sc = raw; scCand = null; scAt = t; }
+  return sc;
+}
+// Severity ladder: calm < info < warn < high (dead is its own calm screen). One source for colour, motion and the overlay-like edge.
+const SR = {calm: 0, info: 1, dead: 1, warn: 2, high: 3}, LR = {none: 0, info: 1, warn: 2, high: 3};
+const SLOT_OWNED = /^(T:|skill:|buy:|dead$)/;   // info calls that a fixed slot already shows (timer, skill, item)
+function severity(s) {
+  if (s === 'dead') return 'dead';
+  if (['wait', 'draft', 'post'].includes(s)) return 'calm';
+  const a = attention(), g = glance(), d = num(g.danger) ? g.danger : 0, def = defendAlert(), r4 = liveAlerts().find(x => x.rule === 'R4');
+  if (s === 'fight') return a.lv === 'high' || d >= 4 || def?.level === 'high' || nearEnemies() >= (phase() === 'laning' ? 3 : 2) ? 'high' : 'warn';
+  if (s === 'rosh' && (r4 || W.obj?.rosh?.state === 'maybe' || W.decision?.rosh_taken?.p >= .6)) return r4?.level === 'high' ? 'high' : 'warn';
+  if (a.lv === 'high' || a.lv === 'warn') return a.lv;
+  return a.lv === 'info' && !SLOT_OWNED.test(String(a.id ?? '')) ? 'info' : 'calm';
+}
+const LANES = {top: 'M120 860V150Q120 120 150 120H860', mid: 'M155 845L845 155', bot: 'M140 880H850Q880 880 880 850V140'};
+const laneSvg = lane => `<svg viewBox="0 0 1000 1000"><rect width="1000" height="1000" rx="40" fill="#0c1410" stroke="#3a3123" stroke-width="20"/>${Object.entries(LANES).map(([n, d]) =>
+  `<path d="${d}" fill="none" stroke="${n === lane ? '#fff' : '#3a4436'}" stroke-width="${n === lane ? 90 : 34}" stroke-linecap="round"/>`).join('')}</svg>`;
+const ROLES = ['Carry', 'Mid', 'Off', 'Soft sup', 'Hard sup'];
+const CAUSE = /^(SMOKE|DANGER|GANK|FIGHT|ROSH\??|MISSING|\d+ MISSING)$/i, SAFE = ['BACK', 'HEAL', 'GROUP', 'DEFEND'];
+function heroText(t) {   // rule texts join hero keys with '+': icons + readable names
+  const keys = [];
+  const text = clean(t).replace(/\b[a-z][a-z_]*(?:\+[a-z][a-z_]*)+\b/g, m => { const ks = m.split('+'); keys.push(...ks); return ks.map(pretty).join(' + '); })
+    .replace(/\b[a-z]+(?:_[a-z]+)+\b/g, m => m.replace(/_/g, ' '));
+  return {keys, text};
+}
+let prevSev = 'calm';
+function renderAuto() {
+  let s = scenario();
+  if (view === 'glance' && s === 'dead') s = phase();   // Glance = the PLAY screen pinned
+  const sev = severity(s);
+  document.body.dataset.sc = s; document.body.dataset.sev = sev;
+  if (!firstRender && SR[sev] > SR[prevSev] && sev !== 'dead') escalate(sev);
+  prevSev = sev;
+  if (view !== 'auto' && view !== 'glance') return;
+  const big = ['wait', 'draft', 'post'].includes(s);
+  $('play').hidden = big; $('big').hidden = !big;
+  if (big) { $('big').className = s; return BIG[s]($('big')); }
+  $('play').className = sev;
+  renderPrimary(s, sev); renderSlots(); if (s === 'dead') renderDead(); renderCue(s, sev);
+}
+// Pre-horn brief (W.brief, PRE_GAME / strategy time): the one goal, the lane job, how to talk to the coach
+const brief = () => { const b = obj(W.brief); return b && (b.goal || b.lane) ? b : null; };
+const briefHtml = b => `<div class="bg">${esc(b.goal || b.lane)}</div>${b.goal && b.lane ? `<div class="bl">${esc(b.lane)}</div>` : ''}${b.talk ? `<div class="bt">${esc(b.talk)}</div>` : ''}`;
+function renderPrimary(s, sev) {
+  const el = $('pc'), a = attention(), g = glance(), ac = g.action, d = num(g.danger) ? Math.max(0, Math.min(4, g.danger)) : null, n = nearEnemies();
+  let ic = 'ok', word = '', cause = '', wcls = '', heroes = [], lane = '', tier = '', meta = '';
+  const br = SR[sev] < 2 && s !== 'dead' && brief(), anim = el.className.match(/ on-\w+/)?.[0] || '';
+  if (br) { el.className = 'pn brief' + anim; return set(el, `<div class="pi">${ico('target')}</div><div class="pt">${briefHtml(br)}</div>`); }
+  if (sev === 'warn' || sev === 'high') {
+    const def = defendAlert(), att = a.lv === 'warn' || a.lv === 'high', r = W.obj?.rosh || {}, rosh = s === 'rosh' || a.rule === 'R4';
+    const aw = att ? String(a.word || a.lv.toUpperCase()) : def ? 'DEFEND' : rosh ? 'ROSH?' : g.mia >= 3 ? `${g.mia} MISSING` : d >= 3 ? 'DANGER' : 'FIGHT';
+    let text = att ? a.text || '' : def ? def.text : rosh ? 'Possible Roshan' : n ? `${n} enemies close` : '';
+    ic = att ? a.icon : def ? 'danger' : rosh ? 'rosh' : g.mia >= 3 ? 'missing' : 'danger';
+    word = aw;
+    if (CAUSE.test(aw) && ac && SAFE.includes(ac.word)) {   // say the action; the cause goes on line 2. A decision that disagrees is hidden.
+      word = ac.word; ic = ac.icon; if (!text.toLowerCase().includes(aw.toLowerCase().replace(/^\d+ /, ''))) text = `${aw} · ${text}`;
+    }
+    const dir = DIRT[a.dir || liveAlerts().find(x => x.rule === 'R1' && x.dir)?.dir];   // where the gank comes from
+    if (dir && (a.rule === 'R1' || !att) && !def && !rosh && !text.includes(dir)) text += `${text ? ' · ' : ''}${dir}`;
+    const lt = a.rule === 'R10' ? a.text : def?.text || '';
+    lane = /\b(top|mid|bot)\b/i.exec(lt)?.[1]?.toLowerCase() || '';
+    if (lane) { tier = /\b(T[1-4]|rax|ancient)\b/i.exec(lt)?.[1] || ''; text = clean(text).replace(/^DEFEND\s+\w+\s+\S+\s*:?\s*/i, ''); }
+    text = text.replace(new RegExp('^' + word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*[:·-]\\s*', 'i'), '');
+    if (rosh && num(r.killed_at) && r.killed_at < 1e8) { const [lo, hi] = RW(); text += `${text ? ' · ' : ''}${String(r.pit || 'top').toUpperCase()} PIT · respawn ${fmt(r.killed_at + lo)}–${fmt(r.killed_at + hi)}`; }
+    const ht = heroText(text), th = (Array.isArray(W.hud?.threats) ? W.hud.threats : []).map(t => short(t.hero)).filter(Boolean);
+    cause = ht.text; heroes = [...new Set(th.length ? th : ht.keys)].slice(0, 3);
+    if (sev === 'high' && d >= 3) meta = `${meter(d)}<b class="${dlev(d)}">${DWORD[d]}</b>${n ? `<span>· ${n} ${n > 1 ? 'enemies' : 'enemy'} close</span>` : ''}`;
+  } else if (sev === 'info') {
+    word = String(a.word || 'INFO'); ic = a.icon; cause = heroText(a.text).text; wcls = 'strong';
+  } else {
+    const w = windowCue(), pre = num(W.game?.clock) && W.game.clock < 0;
+    if (w) { word = w.word; ic = 'push'; cause = w.s; wcls = w.ok ? 'ready' : 'strong'; }
+    else if (ac) { word = ac.word; ic = ac.icon; wcls = 'strong'; cause = clean(W.advice?.headline); }
+    else if (pre) { word = 'ALL CLEAR'; ic = 'ok'; cause = clean(W.advice?.headline) || 'Before the horn: lane, runes, starting items'; }
+    else { const pa = phaseAct(); word = pa.word; ic = pa.icon; cause = clean(W.advice?.headline); }   // no confident decision: the phase default
+  }
+  el.className = 'pn ' + sev + anim;
+  set(el, `<div class="pi">${ico(ic)}</div><div class="pt"><div class="pw ${wcls}" style="font-size:calc(var(--pw) * ${fit(word, sev === 'high' ? 5 : 9.5)})">${esc(word)}</div>
+    ${lane ? `<div class="pl">${laneSvg(lane)}<span>${lane.toUpperCase()}${tier ? ' ' + esc(tier) : ''}</span></div>` : ''}
+    ${cause || heroes.length ? `<div class="pc">${heroes.map(h => imgTag(portrait(h), 'hi')).join('')}<span class="cz">${esc(cause)}</span></div>` : ''}
+    ${meta ? `<div class="pm">${meta}</div>` : ''}</div>`);
+}
+const slotState = {};
+function slot(id, cls, lab, val, sub = '') {
+  const el = $(id);
+  if (slotState[id] !== cls) {   // a slot turning ready/warn fades in once; otherwise slots never move or animate
+    if (!firstRender && /ready|warn|high|act/.test(cls) && Date.now() - lastMotion > 800) onset(el, 'fade');
+    slotState[id] = cls; el.classList.remove('dim', 'ready', 'warn', 'high', 'act'); if (cls) el.classList.add(...cls.split(' '));
+  }
+  set(el, `<div class="lab">${lab}</div><div class="val">${val}</div><div class="sub">${sub}</div>`);
+}
+function renderSlots() {
+  const g = glance(), m = W.me || {}, c = W.game?.clock, pre = num(c) && c < 0, ph = phase();
+  // S1 skill
+  const k = skill();
+  if (!k) slot('s1', 'dim', 'Skill', '—', 'no point to spend');
+  else { const th = (Array.isArray(k.then) ? k.then : []).filter(Boolean).slice(0, 2);
+    slot('s1', 'act', `Skill +${esc(k.points)}`, `<span class="ab">${abImg(k.next)}${k.next.slot && !isTalent(k.next) ? `<i class="kb">${esc(k.next.slot)}</i>` : ''}</span><span class="nm">${esc(k.next.label || k.next.name)}</span>`,
+      th.length ? `<span class="then"><small>THEN</small>${th.map(x => abImg(x)).join('')}</span>` : ''); }
+  // S2 next item
+  const it = g.next_item;
+  if (!it) slot('s2', 'dim', 'Next item', '—');
+  else {
+    const aff = it.affordable ?? (num(it.cost) && num(m.gold) && m.gold >= it.cost), ik = itemKey(it.key || it.name);
+    const q = (Array.isArray(W.advice?.next_items) ? W.advice.next_items : []).filter(i => i && typeof i === 'object' && (i.key || i.name) && itemKey(i.key || i.name) !== ik).slice(0, 2);
+    const p = num(it.cost) && num(m.gold) ? Math.max(0, Math.min(1, m.gold / it.cost)) : null;
+    slot('s2', aff ? 'ready' : '', 'Next item', `${imgTag(itemImg(it.key || it.name), 'itm')}<span class="icol"><span class="nm ellip">${esc(itemName(String(it.name ?? it.key ?? '?')))}</span>
+        <span class="cost">${aff ? `${ico('ok')}<span>${num(it.cost) ? it.cost : 'BUY'}</span>` : `<span class="g">${num(it.cost) ? it.cost : ''}</span>`}</span></span>`,
+      `${p != null && !aff ? `<span class="gbar"><i style="width:${(p * 100).toFixed(1)}%"></i><b>${m.gold} / ${it.cost}</b></span>` : ''}${q.length ? `<span class="then"><small>THEN</small>${q.map(i => imgTag(itemImg(i.key || i.name))).join('')}</span>` : ''}`);
+  }
+  // S3 timers: soonest relevant one large, the next two small
+  const ts = timersList().filter(t => t.s > -3).slice(0, 3);
+  if (!ts.length) slot('s3', 'dim', 'Timers', '—');
+  else { const t = ts[0], lead = num(t.lead) ? t.lead : 20, soon = t.s <= 0 || (lead > 0 && t.s <= lead);
+    slot('s3', soon ? 'warn' : '', 'Timers', `${ico(tIcon(t.name))}<span>${t.s <= 0 ? 'NOW' : fmt(t.s)}</span>`,
+      `<span class="ellip">${esc(t.name)}</span>${ts.slice(1).map(x => `<span class="trow${minor(x.name) ? ' lo' : ''}">${ico(tIcon(x.name))}<span class="ellip">${esc(x.name)}</span><b>${x.s <= 0 ? 'NOW' : fmt(x.s)}</b></span>`).join('')}`); }
+  // B1 danger, B2 missing, B3 Roshan, B4 buyback
+  const d = num(g.danger) && !pre ? Math.max(0, Math.min(4, g.danger)) : null;
+  slot('b1', d == null ? 'dim' : dlev(d), 'Danger', d == null ? '—' : DWORD[d], d == null ? '' : meter(d));
+  const miss = heroesList().filter(h => h.ally === false && !h.dead && !h.visible && num(h.mia_s) && h.mia_s >= 8);
+  slot('b2', pre || g.mia == null ? 'dim' : g.mia >= 3 ? 'warn' : '', 'Missing', pre || g.mia == null ? '—' : esc(g.mia),
+    pre ? 'before the horn' : `<span class="mi">${miss.slice(0, Math.min(5, g.mia ?? 5)).map(h => imgTag(icon(h.key))).join('')}</span>`);
+  const r = W.obj?.rosh || {}, [lo, hi] = RW(), aeg = until(r.aegis_until);
+  let rv = '—', rs = '', rc = 'dim';
+  if (r.state === 'maybe') [rv, rs, rc] = ['MAYBE', `${String(r.pit || 'top')} pit`, 'warn'];
+  else if (r.state === 'dead' && num(r.killed_at) && num(c)) { const e = r.killed_at + lo - c; [rv, rs, rc] = [e > 0 ? fmt(e) : 'WINDOW', `respawn ${fmt(r.killed_at + lo)}–${fmt(r.killed_at + hi)}`, '']; }
+  else if (r.state === 'dead') [rv, rs, rc] = ['DEAD', '', ''];
+  else if (r.state && ph !== 'laning') [rv, rs, rc] = [String(r.state).toUpperCase(), r.pit ? `${r.pit} pit` : '', ''];
+  else if (!r.state && g.rosh && ph !== 'laning') [rv, rs, rc] = [String(g.rosh).split(/[ ,]/)[0].toUpperCase(), String(g.rosh), ''];
+  slot('b3', rc, 'Roshan', rv, aeg > 0 ? `aegis ${fmt(aeg)}` : esc(rs));
+  const b = bb(), early = ph === 'laning' || (num(m.role) && m.role >= 4 && num(c) && c < 1200);
+  slot('b4', !b || early ? 'dim' : b.ok ? 'ready' : '', 'Buyback', !b || early ? '—' : b.ok ? `${ico('ok')}<span>YES</span>` : b.cd ? 'CD' : `<span class="dim">NO</span>`,
+    !b || early ? '' : b.ok ? `<span><span class="g">${m.buyback_cost}</span> of ${m.gold}g</span>` : esc(b.s));
+}
+// The dead screen is the debrief (W.debrief): why first, shopping second. Without it (older server) the top panel is the respawn clock.
+const CAUSES = {alone: 'ALONE', warned: 'CALLED EARLY', first_in: 'FIRST IN', outnumbered: 'OUTNUMBERED', stayed_low: 'STAYED LOW', good_trade: 'GOOD TRADE', coach_miss: 'MY MISS', streak: 'RESET'};
+function renderDead() {
+  const m = W.me || {}, b = bb(), k = skill(), db = obj(W.debrief), g = goal();
+  const rsp = cls => `<div class="lab">Respawn</div><div class="rsp ${cls}">${ico('dead')}<span class="num">${num(m.respawn_s) ? fmt(m.respawn_s) : '—'}</span></div>`;
+  $('deadc').classList.toggle('nod', !db);
+  if (!db) set($('d1'), rsp(''));
+  else {
+    const by = (Array.isArray(db.by) ? db.by : []).map(short).filter(Boolean).slice(0, 4), cw = CAUSES[db.cause], cl = obj(db.called);
+    const called = cl?.word ? `I called <b>${esc(cl.word)}</b>${num(cl.s_before) ? ` ${Math.round(cl.s_before)} s before` : ' before this'}` : '';
+    set($('d1'), `<div class="lab">Why${num(db.n) ? ` · death ${db.n}` : ''}</div><div class="why">${cw ? `<div class="yw${db.cause === 'good_trade' ? ' ok' : ''}">${cw}</div>` : ''}
+      ${db.line ? `<div class="yl">${esc(db.line)}</div>` : ''}
+      ${by.length || called ? `<div class="yb">${by.map(h => imgTag(portrait(h))).join('')}${by.length ? `<span class="ellip">${esc(by.map(pretty).join(', '))}</span>` : ''}${by.length && called ? '<span class="sep">·</span>' : ''}${called ? `<span>${called}</span>` : ''}</div>` : ''}
+      ${db.budget ? `<div class="yg ${g ? goalCls(g) : ''}">${esc(db.budget)}</div>` : ''}</div>`);
+    set($('d0'), rsp('sm'));
+  }
+  set($('d2'), `<div class="lab">Buyback</div>${!b ? '<div class="bbv">—</div>' : b.ok ? `<div class="bbv ok">${ico('ok')}READY <small><span class="g">${m.buyback_cost}</span> of ${m.gold}g</small></div>`
+    : `<div class="bbv${b.cd ? ' cd' : ''}">${b.cd ? 'COOLDOWN' : 'NO'} <small>${esc(b.cd ? fmt(m.buyback_cd) : b.s)}</small></div>`}`);
+  const items = (Array.isArray(W.advice?.next_items) ? W.advice.next_items : []).slice(0, 4).map(i => typeof i === 'string' ? {name: i} : i || {}).filter(i => i.name);
+  set($('d3'), `<div class="lab">Buy now${num(m.gold) ? ` · <span class="g">${m.gold}g</span>` : ''}</div>` + (items.map(i => {
+    const aff = i.affordable ?? (num(i.cost) && num(m.gold) && m.gold >= i.cost);
+    return `<div class="irow ${aff ? 'ok' : 'dim'}">${imgTag(itemImg(i.key || i.name))}<span class="ellip">${esc(itemName(String(i.name)))}</span><b>${aff ? ico('ok') : ''}<span class="${aff ? '' : 'g'}">${num(i.cost) ? i.cost : ''}</span></b></div>`;
+  }).join('') || '<div class="irow dim">—</div>')
+    + (k ? `<div class="irow sk"><span class="ab">${abImg(k.next)}</span><span>Skill: ${esc(k.next.label || k.next.name)}</span><b>${k.next.slot && !isTalent(k.next) ? esc(k.next.slot) : ''}</b></div>` : ''));
+}
+function renderCue(s, sev) {
+  const ac = glance().action || phaseAct(), v = W.voice?.last, c = W.game?.clock;
+  if (s === 'dead') return set($('cue'), `<div class="lab">On respawn</div><div class="cw">${ico(ac.icon)}<span>${esc(ac.word)}</span></div>`);
+  // During a warn/high card only a line spoken since that call began is shown: an older one ("Map is quiet") would contradict the card
+  const stale = SR[sev] >= 2 && !(num(v?.at_clock) && num(attention().since_clock) && v.at_clock >= attention().since_clock);
+  const age = num(v?.at_clock) && num(c) ? ago(Math.max(0, c - v.at_clock)) : '';
+  set($('cue'), `<div class="lab">Coach said</div>${v?.text && !stale ? `<div class="cl">“${esc(clean(v.text))}”</div>${age ? `<div class="ca">${age} ago</div>` : ''}` : '<div class="cl dim">—</div>'}`);
+}
+// Waiting screen, right column: continuity (W.history, read from the profile so it survives a restart) and the ready check (W.ready)
+const RES = {win: ['VICTORY', 'var(--ok)'], loss: ['DEFEAT', 'var(--high)']};
+const day = d => { const t = new Date(d); return d && !isNaN(t) ? t.toLocaleDateString('en-GB', {day: 'numeric', month: 'short', timeZone: 'UTC'}) : ''; };
+const READY = [['gsi', 'Game data'], ['screen', 'Screen'], ['voice', 'Voice'], ['mic', 'Microphone'], ['overlay', 'Overlay']];
+function waitSide() {
+  const h = obj(W.history) || {}, rd = obj(W.ready), gs = (Array.isArray(h.games) ? h.games : []).filter(obj).slice(0, 5);
+  if (gs.length > 1 && gs[0].date && gs.at(-1).date && gs[0].date < gs.at(-1).date) gs.reverse();   // newest first, whichever way the server sorted
+  const last = gs[0], ng = h.next_goal || obj(W.goal)?.text || '', why = obj(W.goal)?.why || '';
+  if (!last && !ng && !rd) return '';
+  const hero = g => short(g.hero), mark = g => g.met === true ? ico('ok').replace('class="ico"', 'class="ico ok"') : g.met === false ? ico('x') : '';
+  const lastHtml = last ? `<div class="pn"><div class="lab">Last game</div>
+      <div class="lg1">${hero(last) ? imgTag(portrait(hero(last))) : ''}<div><b class="res" style="color:${(RES[last.result] || [, 'var(--ink)'])[1]}">${(RES[last.result] || ['PLAYED'])[0]}</b>
+        <div class="mute">${esc([hero(last) && pretty(hero(last)), last.turbo ? 'Turbo' : '', day(last.date)].filter(Boolean).join(' · '))}</div></div></div>
+      ${num(last.deaths) ? `<div class="lg2"><b>${last.deaths}</b>deaths${last.goal ? ` · goal: ${esc(last.goal)}` : ''}</div>` : ''}
+      ${last.met === true ? `<div class="gm ok">${ico('ok')}Goal met</div>` : last.met === false ? `<div class="gm bad">${ico('x')}Goal missed</div>` : ''}</div>` : '';
+  const goalHtml = ng ? `<div class="pn"><div class="lab">This game's goal</div><div class="ng">${esc(ng)}</div>${why ? `<div class="ngw">${esc(why)}</div>` : ''}</div>` : '';
+  const strip = gs.length > 1 ? `<div class="pn"><div class="lab">Last ${gs.length} games</div><div class="g5">${gs.slice().reverse().map((g, i, a) => {
+    const wd = num(g.warned_died) && num(g.deaths) ? Math.round(g.warned_died * g.deaths) : null;   // a count, not a share
+    return `<div class="gc${i === a.length - 1 ? ' cur' : ''}" title="${esc([day(g.date), g.goal].filter(Boolean).join(' · '))}">${hero(g) ? imgTag(icon(hero(g))) : '<i></i>'}<span class="wl ${esc(g.result)}">${g.result === 'win' ? 'WIN' : g.result === 'loss' ? 'LOSS' : ''}</span>
+      <span class="gd">${num(g.deaths) ? g.deaths : '–'}<small>deaths</small>${mark(g)}</span><span class="gw">${wd != null ? `${wd} after a call` : '&nbsp;'}</span></div>`; }).join('')}</div></div>` : '';
+  const ready = rd ? `<div class="pn"><div class="lab">Ready check</div><div class="rcs">${READY.map(([k, lb]) => { const r = obj(rd[k]) || {};
+    return `<div class="rc"><span class="dot ${r.ok === true ? 'g' : r.ok === false ? 'a' : 'o'}"></span><b>${lb}</b><span class="mute ellip">${esc(r.text || (r.ok === true ? 'OK' : r.ok === false ? 'Needs a look' : 'Not checked yet'))}</span>${k === 'voice' ? '<button data-voice-test>Test voice</button>' : '<i></i>'}</div>`; }).join('')}</div></div>` : '';
+  return `<div class="wside">${lastHtml && goalHtml ? `<div class="wrow">${lastHtml}${goalHtml}</div>` : lastHtml + goalHtml}${strip}${ready}</div>`;
+}
+const BIG = {
+  wait(el) {
+    const st = waitState(), side = waitSide();
+    set(el, `<div class="ww${side ? ' has' : ''}"><div class="wt"><div class="lg"><i class="sym dsym"></i><img class="wm" src="/img/dota2_wordmark.png" alt="Dota 2"><div class="app">FOGWATCH<small>live coach</small></div></div>
+      <div class="w1 ${st.tone}">${st.tone === 'ok' ? ico('ok') : ''}${esc(st.text.replace(CMD, '').trim())}${st.chip ? '<br>' + cmdChip() : ''}</div>
+      ${side ? '' : '<div class="w2">Auto follows the game: draft, laning, fights, death, Roshan and the post-game report.</div>'}</div>${side}</div>`);
+  },
+  draft(el) {
+    const ds = W.draft_seen && typeof W.draft_seen === 'object' ? W.draft_seen : null;   // read off the pick screen (vision.draft_picks)
+    const teamsHtml = () => !ds ? '' : `<div class="teams">${[['allies', 'Your team'], ['enemies', 'Enemies']].map(([k, lb]) =>
+      `<div class="tm"><span class="lab">${lb}</span><div class="tr">${(Array.isArray(ds[k]) ? ds[k] : []).map(h => h
+        ? `<span class="th" title="${esc(pretty(h))}">${imgTag(portrait(h))}</span>` : '<span class="th empty">?</span>').join('')}</div></div>`).join('')}</div>`;
+    const d = W.draft && typeof W.draft === 'object' ? W.draft : {}, picks = (Array.isArray(d.picks) ? d.picks : []).slice(0, 5), manual = num(d.role), cur = manual ? d.role : W.me?.role, ms = W.game?.mode_src, br = brief();
+    set(el, `${br ? `<div class="pn brief dbr">${ico('target')}<div>${briefHtml(br)}</div></div>` : ''}<div class="drh"><span class="lab">Pick for</span><div class="seg"><button data-role="auto" class="${manual ? '' : 'on'}">Auto</button>${ROLES.map((n, i) =>
+        `<button data-role="${i + 1}" class="${cur === i + 1 ? manual ? 'on' : 'auto' : ''}"><b>${i + 1}</b>${n}</button>`).join('')}</div></div>
+      ${teamsHtml()}
+      ${d.picked ? `<div class="picks"><div class="pn pick picked">${imgTag(portrait(short(d.picked.hero)))}<span class="kb you">YOU</span>
+        <b class="nm">${esc(d.picked.name)}</b><span class="why">Picked. Lane plan and enemy threats appear when the game loads.</span></div></div>`
+        : picks.length ? `<div class="picks">${picks.map((p, i) => `<div class="pn pick${i === 0 ? ' top' : ''}">${imgTag(portrait(short(p.hero)))}
+        ${p.kind ? `<span class="kb ${p.kind === 'you' ? 'you' : 'meta'}">${p.kind === 'you' ? 'YOU' : 'META'}</span>` : ''}<b class="nm">${esc(p.name || pretty(short(p.hero)))}</b>
+        <span class="wr">${num(p.wr) ? (p.wr * 100).toFixed(1) + '%' : ''}</span><span class="wrb"><i style="width:${num(p.wr) ? Math.max(4, Math.min(100, (p.wr - .4) / .2 * 100)).toFixed(0) : 0}%"></i></span>
+        ${p.why ? `<span class="why">${esc(p.why)}</span>` : ''}${num(p.role) ? `<span class="pos">POS ${p.role} · ${ROLES[p.role - 1] || ''}</span>` : ''}</div>`).join('')}</div>`
+        : '<div class="wt"><div class="w1">No pick data yet</div></div>'}
+      <div class="trb">${ms === 'detecting' ? '<span class="warn">Turbo: detecting…</span>' : `Turbo: ${isTurbo() ? 'yes' : 'no'} (${esc(ms || 'auto')})`} · win rates from ${esc(d.src || 'pubs')}</div>`);
+  },
+  post(el) {
+    const p = W.postgame && typeof W.postgame === 'object' ? W.postgame : null;
+    if (!p) return set(el, `<div class="wt"><div class="w1">Session ended — analysing…</div></div>`);
+    const wt = p.win_team || (W.game?.win_team !== 'none' ? W.game?.win_team : null), mine = p.team || W.me?.team;
+    const [word, col] = wt === 'radiant' || wt === 'dire' ? [wt === mine ? 'VICTORY' : 'DEFEAT', wt === mine ? 'var(--ok)' : 'var(--high)']
+      : {win: ['VICTORY', 'var(--ok)'], loss: ['DEFEAT', 'var(--high)']}[p.result] || ['GAME OVER', 'var(--ink)'];
+    const kda = Array.isArray(p.kda) ? p.kda : [p.k, p.d, p.a], hero = short(p.hero || W.me?.hero), dur = num(p.duration) ? p.duration : null;
+    const stat = (lb, v) => v == null || v === '' ? '' : `${lb} <b>${esc(v)}</b>`;
+    const deaths = (Array.isArray(p.deaths) ? p.deaths : []).filter(d => d && num(d.clock)).sort((a, b) => a.clock - b.clock), span = dur || Math.max(60, ...deaths.map(d => d.clock));
+    const last = {w: [-99, 1], u: [-99, 1]};   // per side: [last pct, last row]; labels closer than 5% alternate rows
+    const marks = deaths.map(d => { const k = d.warned ? 'w' : 'u', x = Math.min(100, 100 * Math.max(0, d.clock) / span), row = x - last[k][0] < 5 ? 1 - last[k][1] : 0; last[k] = [x, row];
+      return `<i class="${k} r${row}" style="left:${x.toFixed(1)}%" title="${esc(`${fmt(d.clock)} ${d.zone || ''}${d.warning ? ' · ' + d.warning : ''}`)}"><span>${d.warned ? '▲' : '▼'}</span><b>${fmt(d.clock)}</b></i>`; }).join('');
+    const list = (t, a, cls = '') => `<div class="pn ${cls}"><div class="lab">${t}</div><ul>${(Array.isArray(a) ? a : []).slice(0, 5).map(x => `<li>${esc(x)}</li>`).join('') || '<li class="dim">—</li>'}</ul></div>`;
+    const one = (t, x) => `<div class="pn"><div class="lab">${t}</div><div class="one${x ? '' : ' dim'}">${esc(x || '—')}</div></div>`;
+    const c = obj(p.scorecard), first = a => Array.isArray(a) && a.length ? String(a[0]) : '';
+    // v2 fields first; an older report falls back to its first lesson / highlight / goal and to the scorecard for the coach's own misses
+    const g = obj(p.goal), met = g?.met === true ? 'ok' : g?.met === false ? 'bad' : '';
+    const lesson = p.one_lesson || first(p.lessons), praise = p.one_praise || first(p.highlights), next = p.next_goal || obj(W.history)?.next_goal || first(p.goals);
+    const misses = p.coach_misses || (num(c?.missed_deaths) && c.missed_deaths > 0 ? `${c.missed_deaths === 1 ? 'One' : c.missed_deaths} of your deaths had no call from me first.` : '');
+    const kdaT = kda.some(num) ? kda.map(v => v ?? 0).join(' / ') : '';
+    // dev numbers and rule IDs: only inside the collapsed details
+    const dev = [[stat('KDA', kdaT && kdaT.replace(/ /g, '')), stat('GPM', p.gpm), stat('XPM', p.xpm), stat('LH', num(p.lh) ? `${p.lh}/${p.dn ?? 0}` : ''), p.buildings_lost != null ? stat('Buildings lost', p.buildings_lost) : ''].filter(Boolean).join(' · '),
+      c ? [num(c.useful) ? `calls useful <b>${c.useful}</b>` : '', num(c.likely_false) ? `likely false <b>${c.likely_false}</b>` : '', num(c.missed_deaths) ? `deaths with no warning <b>${c.missed_deaths}</b>` : ''].filter(Boolean).join(' · ') : '',
+      obj(c?.alerts_by_rule) ? 'alerts by rule: ' + Object.entries(c.alerts_by_rule).map(([k, v]) => `${esc(k)} ${esc(v)}`).join(' · ') : '',
+      [num(c?.jev_calls) ? `decision calls ${c.jev_calls}×` : '', num(c?.llm_calls) ? `LLM ${c.llm_calls}×` : '', num(c?.usd) ? '$' + c.usd.toFixed(2) : '', p.report ? esc(p.report) : ''].filter(Boolean).join(' · ')].filter(Boolean);
+    set(el, `<div class="pgh${g ? ' hasg' : ''}">${g ? `<div class="pgg ${met}">${met ? ico(met === 'ok' ? 'ok' : 'x') : ico('target')}<div><div class="gw">${met === 'ok' ? 'GOAL MET' : met ? 'GOAL MISSED' : 'GOAL'}</div>
+          <div class="gt">${esc(g.text || '')}${num(g.now) ? `${g.text ? ' · ' : ''}<b>${g.now}</b> this game` : ''}</div></div></div>` : ''}
+        <div class="pgm">${hero ? imgTag(portrait(hero)) : ''}<div><div class="pgr" style="color:${col}">${word}</div><div class="mute">${[kdaT, dur != null ? fmt(dur) : ''].filter(Boolean).join(' · ')}</div></div></div></div>
+      ${deaths.length ? `<div class="pgd"><span class="lab">Deaths</span><span><b>${deaths.filter(d => d.warned).length} of ${deaths.length}</b> warned</span><span class="w">▲ warned</span><span class="u">▼ no warning</span></div>
+        <div class="dt"><div class="trk"></div>${marks}</div>` : ''}
+      <div class="pgl">${one('Change one thing', lesson)}${one('You did this well', praise)}${one('My misses', misses)}</div>
+      ${next ? `<div class="pn pgn">${ico('target')}<div><div class="lab">Next game's goal</div><div class="ng">${esc(next)}</div></div></div>` : ''}
+      <details class="pgx"><summary>Details</summary><div class="pgl">${list('Lessons', p.lessons)}${list('Goals', p.goals)}${list('Highlights', p.highlights, 'hl')}</div>${dev.map(x => `<div class="pgc">${x}</div>`).join('')}</details>`);
+  }};
+
+// static map decor: approximate tower spots in svg space
+$('towers').innerHTML = [[120,640],[120,450],[120,250],[300,880],[520,880],[700,880],[250,750],[330,670],[400,600],
+  [880,360],[880,550],[880,750],[700,120],[480,120],[300,120],[750,250],[670,330],[600,400]]
+  .map(([x, y]) => `<rect x="${x - 11}" y="${y - 11}" width="22" height="22" rx="3"/>`).join('');
+
+function heroesList() {
+  const H = W.heroes && typeof W.heroes === 'object' ? W.heroes : {};
+  return Object.entries(H).filter(([, h]) => h && typeof h === 'object').map(([k, h]) => ({...h, key: short(k)}));
+}
+const isRad = h => String(h.team ?? '').toLowerCase().includes('radiant') || h.team === 2;
+
+function renderHeader() {
+  const g = W.game || {}, m = W.me || {}, s = sc || 'wait', post = s === 'post', live = !['wait', 'draft', 'post'].includes(s);
+  $('clock').textContent = live ? fmt(g.clock) : '';
+  document.body.classList.toggle('paused', live && !!g.paused);
+  set($('dn'), !live ? '' : g.ns_night ? ico('night') + '<small>NS</small>' : g.daytime === true ? ico('day') : g.daytime === false ? ico('night') : '');
+  const ph = ['fight', 'rosh'].includes(s) ? phase() : s;
+  $('phase').textContent = post ? `MATCH ENDED${num(W.postgame?.duration) ? ' · ' + fmt(W.postgame.duration) : ''}` : s === 'laning' && num(g.clock) && g.clock < 0 ? 'PRE-HORN' : SCN[ph] || '';
+  set($('flags'), (g.paused && live ? '<span class="chip warn">PAUSED</span>' : '') + (isTurbo() && live ? '<span class="chip">TURBO</span>' : '')
+    + (g.kind && g.kind !== 'normal' ? `<span class="chip">${esc(g.kind)}</span>` : '') + (!['auto', 'glance'].includes(view) ? `<span class="chip">${esc(view.toUpperCase())} VIEW</span>` : ''));
+  const hero = short(m.hero);
+  set($('me'), !hero || !live ? '' : `${imgTag(icon(hero))}<small>LVL</small>${esc(m.level ?? '?')}`);
+  // the game's one goal, counted live (W.goal): "Deaths 3 / 6", amber at the limit, red over it. KDA / LH / gold are on the game screen.
+  const gl = goal(), ge = $('goal');
+  ge.className = gl && live ? goalCls(gl) : ''; ge.title = gl ? [gl.text, gl.why].filter(Boolean).join(' · ') : '';
+  set(ge, !gl || !live ? '' : `<small>${esc(gl.kind === 'deaths' || !gl.kind ? 'Deaths' : pretty(String(gl.kind)))}</small><b>${num(gl.now) ? gl.now : 0}</b><i>/ ${gl.target}</i>`);
+  // one health dot; amber + a plain word for the first broken source. A closed game is not a fault: nothing but OFFLINE on the waiting screen.
+  const sa = W.src_age || {}, cv = W.cv || {}, llm = W.llm || {}, jv = W.jev || {};
+  const bad = sseDown ? 'OFFLINE' : s === 'wait' ? '' : num(sa.gsi_s) && sa.gsi_s >= 3 ? `GAME DATA ${ago(sa.gsi_s)}` : !num(sa.gsi_s) && g.state ? 'NO GAME DATA'
+    : cv.err || (num(sa.cv_s) && cv.frame_ok === false) ? 'SCREEN' : (llm.enabled && llm.ok === false) || (jv.enabled && jv.ok === false) ? 'ADVICE' : '';
+  set($('health'), `<span class="hd${bad ? ' bad' : ''}" title="${esc(bad ? cv.err || llm.err || jv.err || '' : '')}"><i></i>${esc(bad)}</span>`);
+  const r = W.rec, muted = W.talk && W.settings?.mic === false;
+  set($('exc'), (quiet() ? '<span class="chip warn" title="The coach is quiet: urgent calls only. Change it in settings or say “talk again”.">QUIET</span>' : '')
+    + (W.settings?.voice === false ? '<span class="chip">VOICE OFF</span>' : '') + (muted ? '<span style="color:var(--high)">MIC MUTED</span>' : '') + (r?.on && s !== 'wait' ? '<span class="recd"><i></i>REC</span>' : ''));
+  $('pgBan').hidden = !post || view === 'auto';
+}
+
+// ---- attention layer ----------------------------------------------------------------------------------------------
+function renderAttention() {
+  const a = attention(), lv = a.lv, wait = waitMsg();
+  if (num(a.seq)) {   // a new call at the same or a higher level re-fires the one-shot onset; a downgrade never animates
+    if (lastSeq != null && a.seq > lastSeq && lv !== 'none' && !firstRender && LR[lv] >= LR[lastLv]) {
+      const cur = document.body.dataset.sev; escalate(SR[cur] >= 2 ? cur : 'info'); onset($('top'), 'fade');
+    }
+    lastSeq = a.seq;   // a lower seq (server restart) just re-bases
+  }
+  lastLv = lv;
+  document.body.dataset.att = lv;
+  const word = lv !== 'none' ? String(a.word || lv.toUpperCase()) : wait ? 'WAITING' : 'ALL CLEAR';
+  const ic = lv !== 'none' ? a.icon : wait ? 'night' : 'ok', text = lv !== 'none' ? heroText(a.text).text : wait || 'nothing urgent';
+  const age = lv !== 'none' && num(a.since_clock) && num(W.game?.clock) ? ago(Math.max(0, W.game.clock - a.since_clock)) : '';
+  $('top').className = 'panel ' + lv;
+  set($('top'), `${ico(ic)}<div style="min-width:0"><div class="w">${esc(word)}</div><div class="tx">${esc(text)}</div></div><em>${age}</em>`);
+}
+let lastMotion = 0;   // never animate two things at once: a slot fade waits out any onset in the last 800 ms
+function onset(el, k) { if (!el) return; lastMotion = Date.now(); el.classList.remove('on-fade', 'on-pulse', 'on-rise'); void el.offsetWidth; el.classList.add('on-' + k); }
+document.addEventListener('animationend', e => e.target.classList?.remove('on-fade', 'on-pulse', 'on-rise'));
+function escalate(sev) {   // the only motion: one onset (<= 600 ms), then static
+  if (Date.now() - (escalate.t || 0) < 800) return;
+  escalate.t = Date.now();
+  if (sev === 'high') { const f = $('flash'); f.className = ''; void f.offsetWidth; f.className = 'high'; onset($('pc'), 'rise'); beep(2); }
+  else if (sev === 'warn') { onset($('pc'), 'pulse'); beep(1); }
+  else onset($('pc'), 'fade');
+}
+$('flash').onanimationend = e => e.target.className = '';
+
+// ---- map / panels -------------------------------------------------------------------------------------------------
+const units = {};
+function unit(key) {
+  if (!units[key]) {
+    const g = document.createElementNS(NS, 'g'), r = document.createElementNS(NS, 'circle');
+    r.setAttribute('class', 'reach'); $('reach').appendChild(r);
+    g.innerHTML = '<circle class="halo" r="36" fill="none"/><circle class="ring" r="26"/><image width="40" height="40" x="-20" y="-20"/><text y="-36"></text>';
+    g.querySelector('image').setAttribute('href', icon(key));
+    $('units').appendChild(g); units[key] = {g, r};
+  }
+  return units[key];
+}
+function renderMap() {
+  const me = W.me || {}, my = short(me.hero), drawn = new Set();
+  let gi = 0;
+  const place = (key, cls, x, y, label, reach) => {
+    const u = unit(key), [sx, sy] = sv(x, y);
+    u.g.setAttribute('class', 'u ' + cls); u.g.setAttribute('transform', `translate(${sx.toFixed(1)},${sy.toFixed(1)})`);
+    u.g.style.display = ''; const t = u.g.querySelector('text'); t.textContent = label || '';
+    t.setAttribute('y', cls === 'ghost' && gi++ % 2 ? 62 : -36);   // nudge alternate ghost labels below so nearby ones don't stack
+    u.g.querySelector('.halo').style.display = cls === 'me' ? '' : 'none';
+    if (reach > 0) { u.r.setAttribute('cx', sx); u.r.setAttribute('cy', sy); u.r.setAttribute('r', Math.min(reach, 6000) / 16.6); u.r.style.display = ''; }
+    else u.r.style.display = 'none';
+    drawn.add(key);
+  };
+  for (const h of heroesList()) {
+    if (h.key === my || h.dead) continue;
+    const [lx, ly] = xy(h.last_xy);
+    if (h.visible && num(h.x) && num(h.y)) place(h.key, h.ally ? 'ally' : 'enemy', h.x, h.y);
+    else if (!h.ally && num(lx) && num(ly)) place(h.key, 'ghost', lx, ly, num(h.mia_s) ? `${Math.round(h.mia_s)}s` : '?', num(h.reach_u) && num(h.vanished_at) && h.mia_s <= 15 ? h.reach_u : 0);  // ring only for a hero seen walking into fog
+  }
+  if (my && me.alive !== false) {
+    const mh = (W.heroes || {})[my] || (W.heroes || {})['npc_dota_hero_' + my] || {};
+    const x = num(me.x) ? me.x : mh.x, y = num(me.y) ? me.y : mh.y;
+    if (num(x) && num(y)) place(my, 'me', x, y);
+  }
+  for (const k in units) if (!drawn.has(k)) { units[k].g.style.display = 'none'; units[k].r.style.display = 'none'; }
+  // threat pings (W.hud from rules.py): ring x3 then a static ring; fight = ink swords
+  const hud = W.hud || {}, pp = [];
+  for (const t of Array.isArray(hud.threats) ? hud.threats : []) { if (!num(t.x) || !num(t.y)) continue; const [px, py] = sv(t.x, t.y), col = t.kind === 'smoke' ? 'var(--warn)' : 'var(--high)';   // a smoke guess is amber
+    pp.push(`<circle class="ping" cx="${px.toFixed(0)}" cy="${py.toFixed(0)}" r="60" fill="none" stroke="${col}" stroke-width="6"/><circle cx="${px.toFixed(0)}" cy="${py.toFixed(0)}" r="46" fill="none" stroke="${col}" stroke-width="4" ${t.kind === 'smoke' ? 'stroke-dasharray="10 8"' : ''}/>`); }
+  if (hud.fight && num(hud.fight.x)) { const [fx, fy] = sv(hud.fight.x, hud.fight.y);
+    pp.push(`<circle cx="${fx.toFixed(0)}" cy="${fy.toFixed(0)}" r="40" fill="none" stroke="var(--ink)" stroke-width="4"/><path d="M${fx - 18} ${fy - 18}l36 36M${fx + 18} ${fy - 18}l-36 36" stroke="var(--ink)" stroke-width="6" stroke-linecap="round"/>`); }
+  set($('pings'), pp.join(''));
+  // Roshan pits from W.obj.rosh.pits {top:[x,y], bot:[x,y]} (server holds the defaults)
+  const r = W.obj?.rosh || {}, pits = r.pits && typeof r.pits === 'object' ? r.pits : {};
+  const col = {alive: 'var(--ink)', maybe: 'var(--warn)', dead: 'var(--ink-3)'}[r.state] || 'var(--ink)';
+  const [lo, hi] = RW();
+  let sub = '';
+  if (r.state === 'dead' && num(r.killed_at)) { const a = until(r.killed_at + lo), b = until(r.killed_at + hi); sub = a > 0 ? `${fmt(a)}–${fmt(b)}` : `≤${fmt(b)}`; }
+  else if (r.state === 'maybe') sub = 'maybe up';
+  const aeg = until(r.aegis_until);
+  if (aeg > 0) sub += `${sub ? ' · ' : ''}aegis ${fmt(aeg)}`;
+  set($('pits'), Object.entries(pits).map(([name, p]) => {
+    const [x, y] = xy(p); if (!num(x) || !num(y)) return '';
+    const [sx, sy] = sv(x, y), on = (r.pit || 'top') === name;
+    return `<g class="pit" transform="translate(${sx},${sy})" opacity="${on ? 1 : .3}"><circle r="30" fill="#0b0f14" stroke="${on ? col : '#555'}"
+      ${r.state === 'maybe' && on ? 'stroke-dasharray="8 6"' : ''}/><text y="11">R</text>
+      ${on && sub ? `<text y="-46" style="font-size:26px;fill:${col}">${sub}</text>` : ''}</g>`;
+  }).join(''));
+  const msg = waitMsg(), b = $('banner');
+  b.className = msg ? 'on' : ''; if (msg) set(b, esc(msg).replace(' — ', '<br><span class="mute" style="font-size:20px">') + (msg.includes(' — ') ? '</span>' : ''));
+}
+
+function renderLineup() {
+  const hs = heroesList(), my = short(W.me?.hero), slot = h => num(h.slot) ? h.slot : 99;
+  const side = rad => hs.filter(h => isRad(h) === rad).sort((a, b) => slot(a) - slot(b)).slice(0, 5);
+  const cell = h => `<div class="lp ${isRad(h) ? 'rad' : 'dire'}${h.dead ? ' dead' : ''}${h.key === my ? ' mine' : ''}" title="${esc(pretty(h.key))}">${imgTag(portrait(h.key))}
+    ${h.dead ? `<span class="mute">${num(h.respawn_s) ? Math.ceil(h.respawn_s) + 's' : 'DEAD'}</span>` : !h.ally && num(h.mia_s) && h.mia_s >= 8 ? `<span style="color:var(--warn)">MIA ${Math.round(h.mia_s)}s</span>` : ''}</div>`;
+  const pad = a => a.map(cell).join('') + '<div class="lp"></div>'.repeat(5 - a.length);
+  const sc = W.game?.score;
+  set($('lineup'), pad(side(true)) + `<span id="score"><span style="color:var(--ally)">${esc(sc?.[0] ?? '–')}</span> : <span style="color:var(--enemy)">${esc(sc?.[1] ?? '–')}</span>${W.lineup && !W.lineup.locked ? '<br><span class="mute" style="font-size:16px">unlocked</span>' : ''}</span>` + pad(side(false)));
+}
+
+function renderAlerts() {
+  const al = liveAlerts().sort((a, b) => (RANK[b.level] || 0) - (RANK[a.level] || 0) || (b.at ?? 0) - (a.at ?? 0));
+  const fade = a => a.level === 'info' && num(a.ttl) && a.ttl > 0 && a.age != null ? Math.max(.35, 1 - a.age / a.ttl) : 1;   // warn/high stay live while refreshed
+  set($('feedl'), al.slice(0, 5).map(a => `<div class="${esc(a.level)}" style="opacity:${fade(a).toFixed(2)}"><b></b>${esc(heroText(a.text).text)}<em>${ago(a.age)}</em></div>`).join('')
+    || `<div class="mute">${W.game?.state ? 'All clear' : 'No game'}</div>`);
+}
+
+function renderJev() {
+  const d = W.decision, j = W.jev || {};
+  if (!d || typeof d !== 'object') return set($('jevp'), `<div class="ttl">Jev decision</div><div class="mute">${j.enabled ? (j.err ? 'error: ' + esc(j.err) : 'waiting for first decision…') : 'off (no JEV_API_KEY or --no-jev)'}</div>`);
+  const ac = d.action || {}, [word, ic] = ACT[ac.choice] || [String(ac.choice ?? '—').toUpperCase(), 'ok'];
+  const others = Object.entries(ac.probs && typeof ac.probs === 'object' ? ac.probs : {}).filter(([k]) => k !== ac.choice).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const dn = num(d.danger?.score) ? Math.max(0, Math.min(4, Math.round(d.danger.score))) : null, age = num(d.at_clock) && num(W.game?.clock) ? ago(Math.max(0, W.game.clock - d.at_clock)) : '';
+  const ch = (txt, cls = '') => `<span class="chip ${cls}">${txt}</span>`;
+  set($('jevp'), `<div class="ttl">Jev decision <span class="chip">${esc(d.model || 'jev')}${age ? ' · ' + age : ''}${num(d.latency_ms) ? ' · ' + Math.round(d.latency_ms) + 'ms' : ''}</span></div>
+    <div class="ja" style="color:${ac.p >= .6 ? 'var(--ink)' : 'var(--ink-2)'}">${ico(ic)}<span>${esc(word)}</span>${pbar(ac.p, ac.p >= .6 ? 'var(--ink)' : 'var(--ink-2)')}<small>${pc(ac.p)}${others.length ? ' · ' + others.map(([k, p]) => `${esc(k.replace(/_/g, ' '))} ${pc(p)}`).join(', ') : ''}</small></div>
+    <div class="jc">${d.where?.choice ? ch(`where: ${esc(d.where.choice.replace(/_/g, ' '))} ${pc(d.where.p)}`) : ''}
+      ${dn != null ? ch(`danger ${meter(dn)} ${DWORD[dn]}`, dlev(dn)) : ''}
+      ${num(d.fight?.p) ? ch(`fight ${pc(d.fight.p)}`) : ''}
+      ${num(d.rosh_taken?.p) ? ch(`rosh taken ${pc(d.rosh_taken.p)}`, d.rosh_taken.p >= .5 ? 'warn' : '') : ''}
+      ${d.next_item?.choice ? ch(`${imgTag(itemImg(d.next_item.choice), 'ji')} ${esc(itemName(d.next_item.choice))} ${pc(d.next_item.p)}`) : ''}
+      ${d.target?.choice ? ch(`target: ${esc(pretty(short(d.target.choice)))} ${pc(d.target.p)}`, 'high') : ''}</div>`);
+}
+
+function renderAdvice() {
+  const a = W.advice || {}, risk = ['low', 'med', 'high'].includes(a.risk) ? a.risk : null;
+  const src = a.src === 'llm' ? 'llm' : 'rules';
+  set($('adv'), `<div class="ttl">Advice <span class="chip">${src}${since(a.at) != null ? ' · ' + ago(since(a.at)) : ''}</span>
+      ${a.where ? `<span class="chip">${esc(String(a.where).replace(/_/g, ' '))}</span>` : ''}${risk ? `<span class="chip risk-${risk}">risk ${risk}</span>` : ''}</div>
+    <h2>${esc(a.headline || (W.game?.state ? 'Play your lane' : 'Waiting for game state'))}</h2>
+    <ul>${(Array.isArray(a.do_now) ? a.do_now : []).slice(0, 3).map(d => `<li>${esc(d)}</li>`).join('')}</ul>
+    ${a.why ? `<div class="why">${esc(a.why)}</div>` : ''}`);
+}
+
+function renderItems() {
+  const gold = W.me?.gold, n = view === 'enemies' ? 5 : 3, jk = W.decision?.next_item?.choice ? itemKey(W.decision.next_item.choice) : null;
+  const next = (Array.isArray(W.advice?.next_items) ? W.advice.next_items : []).slice(0, n).map(i => typeof i === 'string' ? {name: i} : i || {}).filter(i => i.name);
+  const ctr = new Map();
+  for (const e of Array.isArray(W.enemy_report) ? W.enemy_report : [])
+    for (const c of Array.isArray(e?.counter_items) ? e.counter_items : [])
+      for (const part of String(c).split('/').map(s => s.trim()).filter(Boolean)) ctr.has(part) ? ctr.get(part).push(short(e.hero)) : ctr.set(part, [short(e.hero)]);
+  set($('items'), `<div class="ttl">Next items</div>` + (next.map(i => {
+    const aff = i.affordable ?? (num(i.cost) && num(gold) && gold >= i.cost), jev = jk && (jk === itemKey(i.key || '') || jk === itemKey(i.name));
+    return `<div class="it${aff ? ' aff' : ''}">${imgTag(itemImg(i.key || i.name))}${esc(itemName(String(i.name ?? '?')))}${jev ? '<span class="tgt j">JEV</span>' : ''}<span class="c">${aff ? '✓ ' : ''}${num(i.cost) ? i.cost : ''}</span></div>`;
+  }).join('') || '<div class="mute">—</div>') + (ctr.size ? '<div class="ttl" style="margin-top:8px">Counters</div>' + [...ctr].slice(0, view === 'enemies' ? 5 : 2).map(([it, hs]) =>
+    `<div class="it ctr">${imgTag(itemImg(it))}${esc(itemName(it))}<span class="c mute" style="display:flex;gap:2px">${hs.slice(0, 3).map(h => `<img src="${icon(h)}" style="width:22px;height:22px">`).join('')}</span></div>`).join('') : ''));
+}
+
+function renderTimers() {
+  const ts = timersList().slice(0, 5);
+  set($('timers'), '<div class="ttl">Timers</div>' + (ts.map(t => {
+    const lead = num(t.lead) ? t.lead : 20, cls = (t.s <= 0 ? 'now' : t.s <= lead ? 'soon' : '') + (minor(t.name) ? ' lo' : '');
+    return `<div class="tm ${cls}"><span>${esc(t.name)}</span><span class="n">${t.s <= 0 ? 'NOW' : fmt(t.s)}</span></div>`;
+  }).join('') || '<div class="mute">—</div>'));
+}
+
+function renderEnemies() {
+  const rep = new Map((Array.isArray(W.enemy_report) ? W.enemy_report : []).filter(e => e && e.hero).map(e => [short(e.hero), e]));
+  const hs = new Map(heroesList().filter(h => h.ally === false).map(h => [h.key, h]));
+  const keys = [...new Set([...hs.keys(), ...rep.keys()])].slice(0, 5);
+  const ws = k => num(rep.get(k)?.weak_score) ? rep.get(k).weak_score : -9;
+  keys.sort((a, b) => ws(b) - ws(a));
+  const target = keys.find(k => rep.get(k)?.target === true), jt = W.decision?.target, jtk = jt?.choice ? short(jt.choice) : null, nc = view === 'enemies' ? 2 : 1;
+  set($('enemies'), '<div class="ttl">Enemies · weak score</div>' + keys.map(k => {
+    const h = hs.get(k) || {}, e = rep.get(k) || {}, w = ws(k);
+    const [cls, st] = h.dead ? ['dead', `DEAD${num(h.respawn_s) ? ' ' + Math.ceil(h.respawn_s) + 's' : ''}`] : h.visible ? ['vis', 'VISIBLE']
+      : num(h.mia_s) ? ['mia', `MIA ${Math.round(h.mia_s)}s`] : ['', ''];
+    return `<div class="er ${cls}">${imgTag(portrait(k))}<div><div class="nm">${esc(pretty(k))}</div><div class="st ${cls}">${st}${k === target ? '<span class="tgt">TARGET</span>' : ''}${k === jtk ? `<span class="tgt j">JEV ${pc(jt.p)}</span>` : ''}</div></div>
+      <div><div class="wb"><i style="width:${w > -9 ? Math.round(Math.max(.04, Math.min(1, (w + 1.5) / 3)) * 100) : 0}%"></i></div>
+        <div class="mute" style="font-size:16px">${num(e.winrate) ? Math.round(e.winrate * (e.winrate <= 1 ? 100 : 1)) + '% wr' : ''}</div></div>
+      <div class="rs">${esc((Array.isArray(e.reasons) ? e.reasons : []).join(' · '))}</div>
+      <div class="ci">${(Array.isArray(e.counter_items) ? e.counter_items : []).slice(0, nc).map(c => { const n = String(c).split('/')[0].trim(); return imgTag(itemImg(n)) + esc(itemName(n)); }).join(' ')}</div></div>`;
+  }).join(''));
+}
+
+function renderDrawer() {
+  const m = W.me || {}, r = W.rec, turbo = isTurbo(), ms = W.game?.mode_src, auto = /^auto/.test(String(m.role_src ?? ''));
+  document.querySelectorAll('#roles button').forEach(b => { const hit = String(m.role ?? W.settings?.role) === b.textContent;
+    if (b.textContent === 'A') return b.classList.toggle('on', auto || !m.role_src);   // A = auto-detect (also before any role_src exists)
+    b.classList.toggle('on', hit && !auto); b.classList.toggle('auto', hit && auto); });   // outlined = auto-detected, filled = manual
+  $('roleLbl').textContent = auto ? `Role: auto-detected${m.role_src === 'auto-play' ? ' (from play)' : m.role_src === 'auto-hero' ? ' (from hero)' : ''}${num(m.role) ? ' · pos ' + m.role : ''}. Pick a number to override.` : `Role: ${num(m.role) ? 'pos ' + m.role + ' (manual)' : '—'}`;
+  $('turbo').classList.toggle('on', turbo);
+  $('turbo').textContent = ms === 'detecting' ? 'Turbo: detecting…' : ms === 'auto' ? `Turbo: auto (${turbo ? 'on' : 'off'})` : ms === 'manual' ? `Turbo ${turbo ? 'on' : 'off'} (manual)` : turbo ? 'Turbo on' : 'Turbo';
+  $('turbo').title = ms ? `Effective mode: ${turbo ? 'Turbo' : 'Normal'} (${ms}). Click cycles AUTO → ON → OFF → AUTO; next: ${String(turboNext()).toUpperCase().replace('TRUE', 'ON').replace('FALSE', 'OFF')}` : 'Turbo mode';
+  $('marks').textContent = num(r?.marks) ? `${r.marks} marks` : '';
+  set($('rec'), !r ? '<span>no recorder</span>' : !r.on ? '<span>REC off</span>' : `<span class="recd"><i></i>REC</span><span>${num(r.mb) ? Math.round(r.mb) + ' MB' : ''}${num(r.frames) ? ' · ' + r.frames + ' frames' : ''}${r.dropped ? ' · ' + r.dropped + ' dropped' : ''}</span>`
+    + (r.frames_paused ? '<b style="color:var(--warn)">frames paused</b>' : '') + (r.dir ? `<span>${esc(r.dir)}</span>` : ''));
+  // dev telemetry (was in the header)
+  const sa = W.src_age || {}, llm = W.llm || {}, cv = W.cv || {}, jv = W.jev || {}, co = obj(W.coach);
+  const age = s => !num(s) ? 'r' : s < 3 ? 'g' : s < 10 ? 'a' : 'r';
+  const cvc = cv.err || (num(sa.cv_s) && cv.frame_ok === false) ? 'a' : !num(sa.cv_s) ? 'o' : age(sa.cv_s);
+  const svc = s => !s.enabled ? 'o' : s.in_flight ? 'busy' : s.ok === false ? 'a' : 'g';
+  const usd = s => `$${(num(s.usd_est) ? s.usd_est : 0).toFixed(s.usd_est < .01 ? 4 : 3)}`;
+  set($('src'), `<span><span class="dot ${sseDown ? 'r' : age(sa.gsi_s)}"></span> GSI <span class="mute">${num(sa.gsi_s) ? ago(sa.gsi_s) : ''}</span></span>
+    <span title="${esc(cv.err || '')}"><span class="dot ${cvc}"></span> CV <span class="mute">${cv.err ? esc(cv.err) : !num(sa.cv_s) ? 'off' : (num(cv.fps) ? cv.fps.toFixed(1) + ' fps' : '') + (num(cv.ms) ? ' · ' + Math.round(cv.ms) + ' ms' : '') + (cv.affine_ok === false ? ' · uncalibrated' : '')}</span></span>
+    <span><span class="dot ${svc(llm)}"></span> LLM <span class="mute">${llm.enabled ? `${llm.calls ?? 0}× ${usd(llm)}${llm.err ? ' · ' + esc(llm.err) : llm.ok === false ? ' · last call failed (see terminal)' : ''}` : 'off'}</span></span>
+    <span><span class="dot ${svc(jv)}"></span> JEV <span class="mute">${jv.enabled ? `${jv.calls ?? 0}× ${num(jv.latency_ms) ? Math.round(jv.latency_ms) + 'ms ' : ''}${usd(jv)}${jv.err ? ' · ' + esc(jv.err) : ''}` : 'off'}</span></span>
+    ${co ? `<span><span class="dot ${co.quiet ? 'a' : 'g'}"></span> VOICE <span class="mute">${[num(co.spoken) ? `${co.spoken}${num(co.cap) ? ' of ' + co.cap : ''} lines` : '', obj(co.eased) && Object.keys(co.eased).length ? 'eased ' + esc(Object.keys(co.eased).join(' ')) : '',
+      Array.isArray(co.demoted) && co.demoted.length ? 'demoted ' + esc(co.demoted.join(' ')) : ''].filter(Boolean).join(' · ')}</span></span>` : ''}`);
+  syncVoice(); syncMic(); syncOverlay(); syncCoach(); syncAi();
+}
+
+function render() {
+  for (const f of [renderAuto, renderHeader, renderAttention, renderMap, renderLineup, renderAlerts, renderJev, renderAdvice, renderItems, renderTimers, renderEnemies, renderDrawer])
+    try { f(); } catch (e) { $('err').textContent = `${f.name}: ${e.message}`; console.error(f.name, e); }
+  firstRender = false;
+}
+
+// ---- views --------------------------------------------------------------------------------------------------------
+const VIEWS = ['glance', 'map', 'full', 'enemies', 'auto'];
+const PANELS = ['mapbox', 'lineup', 'top', 'feed', 'jevp', 'adv', 'items', 'timers', 'enemies'];
+const mount = v => document.querySelectorAll(`#v-${v} [data-p]`).forEach(p => p.parentNode.insertBefore($(p.dataset.p), p));   // move shared panels in
+function setView(v) {
+  view = VIEWS.includes(v) ? v : v === '0' || v === 'a' ? 'auto' : VIEWS[+v - 1] || 'auto';
+  try { localStorage.setItem('view', view); } catch {}
+  const sec = view === 'glance' ? 'auto' : view;   // Glance = Auto's PLAY screen, pinned
+  document.querySelectorAll('.view').forEach(s => s.classList.toggle('on', s.id === 'v-' + sec));
+  for (const id of PANELS) $('pool').appendChild($(id)); mount(sec);
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.v === view));
+  render();
+}
+
+// ---- controls (settings drawer) ---------------------------------------------------------------------------------------
+const store = (k, v) => { try { v === undefined ? v = localStorage.getItem(k) : localStorage.setItem(k, v); } catch {} return v; };
+const toast = (t, bad) => { $('toast').textContent = t; $('toast').className = bad ? 'bad' : ''; clearTimeout(toast.h); toast.h = setTimeout(() => $('toast').textContent = '', bad ? 5000 : 2500); };
+const post = (url, body) => (MOCK ? Promise.resolve(mockPost(url, body)) : fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body ?? {})})
+  .then(async r => { const j = await r.json().catch(() => ({})); if (!r.ok || j.ok === false) throw new Error(j.error || j.detail || `HTTP ${r.status}`); return j; }))
+  .catch(e => { toast(`${url.split('?')[0]} failed: ${e.message}`, true); return null; });
+const okFlash = b => { if (!b) return; b.classList.add('ok'); setTimeout(() => b.classList.remove('ok'), 1200); };
+document.querySelectorAll('[data-post]').forEach(b => b.onclick = () => post(b.dataset.post).then(j => j && (okFlash(b), toast(`${b.textContent}: ok`))));
+document.addEventListener('click', e => { const b = e.target.closest('[data-role]');   // role segments on the draft screen
+  if (b) { const r = b.dataset.role === 'auto' ? 'auto' : +b.dataset.role; post('/api/settings', {role: r}).then(j => j && (okFlash(b), toast(r === 'auto' ? 'role: auto-detect' : `role ${r}`), render())); } });
+const drawer = open => { $('drawer').hidden = !open; $('gear').setAttribute('aria-expanded', String(open)); $('gear').classList.toggle('on', open); };
+$('gear').innerHTML = ico('gear');
+$('gear').onclick = () => drawer($('drawer').hidden);
+addEventListener('pointerdown', e => { if (!$('drawer').hidden && !e.target.closest('#drawer, #gear, #help')) drawer(false); });   // click outside closes
+$('pgBan').onclick = () => setView('auto');
+// Voice (server-side speech): W.settings.voice, undefined = on. A server without the key (400, or ok without echoing it) -> n/a.
+let voiceNA = false;
+function syncVoice() {
+  if (W.settings && 'voice' in W.settings) voiceNA = false;
+  const b = $('voiceBtn'), on = W.settings?.voice !== false && !voiceNA;
+  b.textContent = voiceNA ? 'Voice n/a' : on ? 'Voice on' : 'Voice off'; b.classList.toggle('on', on); b.disabled = voiceNA;
+  b.title = voiceNA ? 'this coach server has no voice setting yet' : 'spoken alerts from the coach (server side)';
+}
+$('voiceBtn').onclick = async () => {
+  const on = W.settings?.voice === false;   // flip
+  let j;
+  try {
+    if (MOCK) j = mockPost('/api/settings', {voice: on});
+    else {
+      const r = await fetch('/api/settings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({voice: on})});
+      j = await r.json().catch(() => ({}));
+      if (r.status === 400 || r.status === 422) voiceNA = true; else if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    }
+  } catch (e) { return toast(`voice failed: ${e.message}`, true); }
+  if (!voiceNA && j?.settings && !('voice' in j.settings)) voiceNA = true;
+  if (voiceNA) toast('Voice not supported by this server yet', true);
+  else { W.settings = {...W.settings, ...(j?.settings || {voice: on})}; toast(`Voice ${on ? 'on' : 'off'}`); }
+  syncVoice();
+};
+// Coach voice: verbosity (W.settings.verbosity low|normal|high), temporary quiet (W.coach.quiet, set by voice, cleared at the next match), volume 0-1
+function syncCoach() {
+  const tq = tempQuiet(), v = tq ? 'low' : verbosity();
+  document.querySelectorAll('#verb button').forEach(b => b.classList.toggle('on', b.dataset.verb === v));
+  $('verbNote').textContent = tq ? 'Quiet until the next game. Pick Normal to hear the coach again.' : v === 'low' ? 'Urgent calls and the reason for each death only.'
+    : v === 'high' ? 'More thinking prompts between fights.' : 'Urgent calls, a few cues, the debrief when you die.';
+  if (document.activeElement !== $('vol')) $('vol').value = volume();
+}
+const setCoach = (body, msg) => post('/api/settings', body).then(j => { if (!j) return;
+  W.settings = {...W.settings, ...(j.settings || body)}; if (obj(W.coach) && body.quiet === false) W.coach.quiet = false;
+  syncCoach(); renderHeader(); toast(msg); });
+document.querySelectorAll('#verb button').forEach(b => b.onclick = () => setCoach({verbosity: b.dataset.verb, ...(tempQuiet() && b.dataset.verb !== 'low' ? {quiet: false} : {})}, `Coach: ${b.textContent.toLowerCase()}`));
+$('vol').onchange = () => setCoach({volume: +$('vol').value}, 'Volume set');
+// GSI setup help popup (waiting screen "?"), and "Test voice" (waiting screen + drawer): the server plays one calm line
+document.addEventListener('click', e => {
+  const cp = e.target.closest('[data-copy]'), vt = e.target.closest('[data-voice-test]');
+  if (vt) return post('/api/voice-test').then(j => j && (okFlash(vt), toast('Test line sent. You should hear the coach now.')));
+  if (cp) return navigator.clipboard.writeText(CMD).then(() => { cp.textContent = 'Copied ✓'; setTimeout(() => cp.textContent = 'Copy', 1500); }, () => toast('copy failed', true));
+  if (e.target.closest('[data-help]')) $('help').hidden = false;
+  else if (e.target.closest('[data-help-close]') || e.target.id === 'help') $('help').hidden = true;
+});
+// In-game overlay (overlay.py draws /overlay over Dota): W.settings.overlay, undefined = on
+function syncOverlay() { const b = $('ovBtn'), on = W.settings?.overlay !== false; b.textContent = on ? 'Overlay on' : 'Overlay off'; b.classList.toggle('on', on); b.title = 'the HUD drawn over Dota (arrows, minimap marks, alerts)'; }
+$('ovBtn').onclick = async () => {
+  const on = W.settings?.overlay === false, j = await post('/api/settings', {overlay: on});
+  if (j?.settings) { W.settings = {...W.settings, ...j.settings}; toast(`Overlay ${on ? 'on' : 'off'}`); syncOverlay(); }
+};
+// AI switch (settings.ai, off unless true) and the user's own API keys (/api/keys answers set or not, never the values)
+const KEYN = ['openai', 'jev', 'anthropic'];
+var keysSet = {};   // var: renderDrawer may run before this line
+function syncAi() {
+  const on = W.settings?.ai === true, b = $('aiBtn'), any = keysSet.openai || keysSet.jev;
+  b.textContent = on ? 'AI on' : 'AI off'; b.classList.toggle('on', on); b.title = 'GPT advice and Jev decisions (paid with your keys). Off = no AI call at all';
+  $('aiNote').textContent = on && !any ? 'add an OpenAI or Jev key below' : '';
+}
+async function syncKeys() {
+  if (MOCK) return;
+  try { keysSet = await (await fetch('/api/keys')).json(); } catch { return; }
+  for (const n of KEYN) $('ks_' + n).textContent = keysSet[n] ? 'saved ✓' : 'not set';
+  syncAi();
+}
+$('aiBtn').onclick = async () => {
+  const on = W.settings?.ai !== true, j = await post('/api/settings', {ai: on});
+  if (j?.settings) { W.settings = {...W.settings, ...j.settings}; toast(`AI ${on ? 'on' : 'off'}`); syncAi(); }
+};
+$('keySave').onclick = async () => {
+  const body = Object.fromEntries(KEYN.map(n => [n, $('k_' + n).value.trim()]).filter(([, v]) => v));
+  if (!Object.keys(body).length) return toast('paste a key first', true);
+  if (await post('/api/keys', body)) { KEYN.forEach(n => $('k_' + n).value = ''); toast('keys saved'); syncKeys(); }
+};
+syncKeys();
+// Talk to the coach (listen.py): W.settings.mic (mute), mic_mode ptt|always|off, ptt_key; W.talk = {stage, heard, reply, partial, mode, key, ...}
+const STAGE = {recording: 'Recording', transcribing: 'Transcribing', thinking: 'Thinking', speaking: 'Coach speaking', done: 'Done'};
+function syncMic() {
+  const t = W.talk, on = W.settings?.mic !== false, mode = W.settings?.mic_mode || 'ptt', key = W.settings?.ptt_key || t?.key || 'mouse4';
+  $('micMode').textContent = `Mic: ${!t ? 'n/a' : t.state === 'denied' ? 'no permission' : mode === 'ptt' ? 'push-to-talk' : mode}`;
+  $('micMode').disabled = $('micKey').disabled = $('micMute').disabled = $('micKeyIn').disabled = !t;
+  $('micMode').classList.toggle('on', !!t && on && mode !== 'off'); $('micMode').title = t?.err || `${t?.engine || '?'} speech-to-text. Click: PTT → ALWAYS → OFF`;
+  if (document.activeElement !== $('micKeyIn')) $('micKeyIn').value = key;
+  $('keyRow').hidden = mode !== 'ptt';
+  $('micMute').textContent = on ? 'Mute mic' : 'Mic muted'; $('micMute').classList.toggle('on', !on); $('micMute').style.color = on ? '' : 'var(--high)';
+  const st = t?.stage, show = st && st !== 'idle';
+  $('talkPop').hidden = !show;
+  if (show) set($('talkPop'), `<div class="ts">${STAGE[st] || esc(st)}</div>`
+    + (st === 'recording' && t.partial ? `<div class="th">“${esc(t.partial)}”</div>` : t.heard ? `<div class="th">you: “${esc(t.heard)}”</div>` : '')
+    + (t.reply ? `<div class="tr">${esc(t.reply)}</div>` : ''));
+}
+const setMic = (body, msg) => post('/api/settings', body).then(j => { if (j) { W.settings = {...W.settings, ...(j.settings || body)}; syncMic(); toast(msg); } });
+const toggleMic = () => setMic({mic: W.settings?.mic === false}, `Mic ${W.settings?.mic === false ? 'on' : 'muted'}`);
+$('micMute').onclick = toggleMic;
+$('micMode').onclick = () => { const m = W.settings?.mic_mode || 'ptt', nx = {ptt: 'always', always: 'off', off: 'ptt'}[m] || 'ptt'; setMic({mic_mode: nx}, `Mic mode: ${nx}`); };
+const setKey = () => { const k = $('micKeyIn').value.trim(); if (k) setMic({ptt_key: k}, `Push-to-talk: ${k}`); $('micKeyIn').blur(); };
+$('micKey').onclick = setKey;
+$('micKeyIn').onkeydown = e => { if (e.key === 'Enter') setKey(); };
+document.querySelectorAll('#roles button').forEach(b => b.onclick = () => { const r = b.textContent === 'A' ? 'auto' : +b.textContent;
+  post('/api/settings', {role: r}).then(j => j && (okFlash(b), toast(r === 'auto' ? 'role: auto-detect' : `role ${r}`))); });
+// Turbo cycles AUTO -> ON -> OFF -> AUTO (servers without mode_src: plain toggle)
+const turboNext = () => { const ms = W.game?.mode_src; return !ms ? !isTurbo() : ms !== 'manual' ? true : isTurbo() ? false : 'auto'; };
+$('turbo').onclick = () => { const nx = turboNext();
+  post('/api/settings', {turbo: nx}).then(j => { if (j) { W.settings = {...W.settings, ...(j.settings || {})}; renderDrawer(); toast(`Turbo ${nx === 'auto' ? 'auto-detect' : nx ? 'on (manual)' : 'off (manual)'}`); } }); };
+function feedback(kind) {
+  const b = document.querySelector(`[data-fb=${kind}]`);
+  post('/api/feedback', {kind, ref: W.attention?.id ?? null}).then(j => j && (okFlash(b), toast(`saved ✓ ${kind}${num(j.marks) ? ` (${j.marks} marks)` : ''}`),
+    W.rec && num(j.marks) && (W.rec.marks = j.marks, renderDrawer())));
+}
+document.querySelectorAll('[data-fb]').forEach(b => b.onclick = () => feedback(b.dataset.fb));
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => setView(b.dataset.v));
+let insetTimer = null;
+$('insetBtn').onclick = () => {
+  const img = $('inset'), on = !insetTimer;
+  img.style.display = on ? 'block' : 'none'; $('insetBtn').classList.toggle('on', on);
+  clearInterval(insetTimer); insetTimer = null;
+  if (on) { const f = () => img.src = '/minimap.png?t=' + Date.now(); f(); insetTimer = setInterval(f, 1000); }
+};
+// sound (off by default; voice.py owns audio) and motion (follows prefers-reduced-motion unless toggled); both remembered
+let sound = store('sound') === 'on', AC = null;
+const still = () => store('motion') ? store('motion') === 'off' : matchMedia('(prefers-reduced-motion: reduce)').matches;
+function beep(n) {
+  if (!sound) return;
+  try {
+    AC = AC || new AudioContext(); AC.resume();
+    for (let i = 0; i < n; i++) {
+      const o = AC.createOscillator(), g = AC.createGain(), t = AC.currentTime + i * .22;
+      o.frequency.value = n > 1 ? 1046 : 784; g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.35, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + .17);
+      o.connect(g).connect(AC.destination); o.start(t); o.stop(t + .2);
+    }
+  } catch (e) { console.warn('beep', e); }
+}
+const syncToggles = () => { $('soundBtn').textContent = sound ? 'Beep on' : 'Beep off'; $('soundBtn').classList.toggle('on', sound);
+  document.body.classList.toggle('still', still()); $('motionBtn').textContent = still() ? 'Motion off' : 'Motion on'; $('motionBtn').classList.toggle('on', !still()); };
+$('soundBtn').onclick = () => { sound = !sound; store('sound', sound ? 'on' : 'off'); syncToggles(); beep(1); };   // the click also unlocks WebAudio
+$('motionBtn').onclick = () => { store('motion', still() ? 'on' : 'off'); syncToggles(); };
+addEventListener('pointerdown', () => AC && AC.resume(), {passive: true});
+addEventListener('keydown', e => {
+  if (e.key === 'Escape') { drawer(false); $('help').hidden = true; return; }   // even while a drawer input/slider has focus
+  if (e.metaKey || e.ctrlKey || e.altKey || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+  if (e.key >= '1' && e.key <= '4') setView(VIEWS[+e.key - 1]);
+  else if (e.key === '0' || e.key === 'a') setView('auto');
+  else if (e.key === 'g' || e.key === 'b') feedback(e.key === 'g' ? 'good' : 'bad');
+  else if (e.key === 'm') toggleMic();
+  else if (e.key === 'k') drawer(false);
+});
+syncToggles();
+setView(Q.get('view') || store('view') || 'auto');
+if (Q.has('drawer')) { drawer(true); $('dev').open = Q.get('drawer') === 'dev'; }   // ?drawer / ?drawer=dev: open it on load (screenshots)
+
+if (MOCK) startMock();
+else {
+  const es = new EventSource('/events');   // EventSource reconnects on its own
+  es.onmessage = ev => { try { W = JSON.parse(ev.data) || {}; lastMsg = Date.now(); sseDown = false; render(); } catch (e) { console.error('bad event', e); } };
+  es.onerror = () => { sseDown = true; render(); };
+  let build = null;  // server restarted with new code -> reload this page by itself
+  es.onopen = () => { sseDown = false; fetch('/version').then(r => r.json()).then(v => { if (build && v.src_hash !== build) location.reload(); build = v.src_hash; }).catch(() => {}); };
+  setInterval(() => { if (Date.now() - lastMsg > 6000) render(); }, 2000);
+}
+
+function mockPost(url, body) {
+  if (url === '/api/feedback') return {ok: true, marks: ++W.rec.marks};
+  if (url === '/api/settings') { W.settings = {...W.settings, ...body}; if (W.coach) for (const k of ['verbosity', 'volume', 'quiet']) if (k in body) W.coach[k] = body[k];
+    if ('role' in body) body.role === 'auto' ? W.me.role_src = 'auto-hero' : (W.me.role = body.role, W.me.role_src = 'manual');
+    if ('turbo' in body) body.turbo === 'auto' ? W.game.mode_src = 'auto' : (W.game.mode = body.turbo ? 'turbo' : 'normal', W.game.mode_src = 'manual'); if ('role' in body && W.draft) W.draft.role = num(body.role) ? body.role : null; return {ok: true, settings: W.settings}; }
+  return {ok: true};
+}
+function startMock() {
+  const t0 = Date.now() / 1000, c0 = 1122;
+  const H = (team, slot, ally, o) => ({team, slot, ally, visible: true, src: 'gsi', dead: false, mia_s: 0, conf: .9, ...o});
+  W = {t: t0, src_age: {gsi_s: .6, cv_s: .3},
+    game: {state: 'DOTA_GAMERULES_STATE_GAME_IN_PROGRESS', clock: c0, daytime: false, ns_night: false, paused: false, matchid: '8123456789', kind: 'normal', mode: 'normal', score: [12, 17]},
+    me: {hero: 'npc_dota_hero_juggernaut', team: 'radiant', role: 1, level: 14, alive: true, hp_pct: 62, mp_pct: 40, gold: 2840, buyback_cost: 1210, buyback_cd: 0,
+      k: 7, d: 3, a: 5, lh: 142, dn: 9, gpm: 512, xpm: 601, x: -3200, y: -4100},
+    settings: {role: 'auto', bracket: null, turbo: 'auto', mic: true, mic_mode: 'ptt', ptt_key: 'mouse4'},
+    heroes: {juggernaut: H('radiant', 0, true, {x: -3200, y: -4100}), crystal_maiden: H('radiant', 1, true, {x: -2900, y: -4400}),
+      earthshaker: H('radiant', 2, true, {x: -600, y: 900}), lina: H('radiant', 3, true, {x: 400, y: -200}), mars: H('radiant', 4, true, {dead: true, respawn_s: 22}),
+      lion: H('dire', 5, false, {x: 1800, y: -900}), phantom_assassin: H('dire', 6, false, {visible: false, last_xy: [3400, -2600], last_seen: c0 - 23}),
+      pudge: H('dire', 7, false, {visible: false, last_xy: [2900, -3200], last_seen: c0 - 9}), axe: H('dire', 8, false, {dead: true, respawn_s: 14}),
+      nevermore: H('dire', 9, false, {visible: false, last_xy: [5200, 4100], last_seen: c0 - 41})},
+    lineup: {locked: true, scores: Array(10).fill(.9)},
+    obj: {rosh: {state: 'alive', pit: 'bot', aegis_until: null, pits: {top: [-2700, 2300], bot: [2600, -2700]}}},
+    alerts: [{id: 'r3-1', level: 'high', text: 'Possible smoke: PA + Pudge vanished at dire jungle', rule: 'R3', at: c0 - 4, ttl: 45},
+      {id: 'r1-1', level: 'warn', text: 'Likely gank: back toward tower', rule: 'R1', at: c0 - 12, ttl: 20},
+      {id: 'r4-1', level: 'warn', text: 'Possible Roshan', rule: 'R4', at: c0 - 30, ttl: 60},
+      {id: 'r5-1', level: 'info', text: 'Night: vision 800 — ward/avoid river', rule: 'R5', at: c0 - 40, ttl: 60}],
+    timers: [{name: 'Bounty runes', at_clock: 1200, lead: 20}, {name: 'Power rune', at_clock: 1140, lead: 20}, {name: 'Day/Night', at_clock: 1200, lead: 15}, {name: 'Lotus', at_clock: 1260, lead: 0}, {name: 'Wisdom shrine', at_clock: 1260, lead: 30}],
+    advice: {headline: 'Smoke likely coming bot — farm your jungle, hold TP', do_now: ['Farm triangle, not bot lane', 'Keep TP off cooldown', 'Ward river entrance with CM'],
+      next_items: [{name: 'Black King Bar', key: 'black_king_bar', cost: 4050, affordable: false}, {name: 'Blink Dagger', key: 'blink', cost: 2250, affordable: true}, {name: 'Butterfly', key: 'butterfly', cost: 5450, affordable: false}],
+      where: 'own_jungle', risk: 'high', why: 'Two cores missing 20s+ after vanishing together near your lane; night limits vision.', src: 'llm', at: c0 - 8},
+    enemy_report: [{hero: 'lion', target: true, weak_score: 1.2, winrate: .47, reasons: ['low armor', 'low HP', 'no escape'], counter_items: ['black_king_bar']},
+      {hero: 'nevermore', weak_score: .6, winrate: .49, reasons: ['squishy', 'needs farm'], counter_items: ['orchid']},
+      {hero: 'phantom_assassin', weak_score: -.4, winrate: .52, reasons: ['evasion'], counter_items: ['monkey_king_bar']},
+      {hero: 'pudge', weak_score: -.9, winrate: .5, reasons: ['high HP'], counter_items: ['spirit_vessel']},
+      {hero: 'axe', weak_score: -1.1, winrate: .53, reasons: ['tanky'], counter_items: ['ward_sentry / dust']}],
+    decision: {at_clock: c0 - 3, latency_ms: 312, model: 'jev-1.14.0',
+      action: {choice: 'farm_jungle', p: .64, probs: {farm_jungle: .64, retreat: .18, farm_lane: .1, group: .08}}, where: {choice: 'own_jungle', p: .71, probs: {}},
+      danger: {score: 2.4, conf: .6}, rosh_taken: {p: .22}, fight: {p: .31}, next_item: {choice: 'black_king_bar', p: .58}, target: {choice: 'lion', p: .66}},
+    jev: {enabled: true, calls: 41, in_flight: false, ok: true, err: null, last_at: t0 - 3, usd_est: .0012, latency_ms: 312},
+    rec: {on: true, dir: '20261109-222402_8123456789', mb: 412, frames: 5210, dropped: 0, marks: 3, frames_paused: false},
+    attention: {seq: 0, id: null, level: 'none', word: '', icon: 'ok', text: '', since_clock: null, sticky: false},
+    hud: {threats: [], fight: null, mia: []},
+    voice: {enabled: true, last: {text: 'Map is quiet. Farm your jungle and keep TP up.', cue: 'jev', at_clock: c0 - 14}},
+    talk: {state: 'on', engine: 'on-device', mode: 'ptt', key: 'mouse4', stage: 'idle'},
+    cv: {fps: 4, ms: 72, affine_ok: true, frame_ok: true}, llm: {enabled: true, calls: 6, in_flight: false, ok: true, last_at: t0 - 8, usd_est: .012},
+    // coach v2 contract
+    goal: {kind: 'deaths', target: 6, now: 3, left: 3, met: null, text: '6 deaths or fewer', why: 'avg 9.7 deaths in your last 3 games'}, brief: null, debrief: null,
+    coach: {quiet: false, eased: {R3: 812}, spoken: 14, cap: 30, verbosity: 'normal', volume: 1, demoted: ['R3']},
+    history: {next_goal: '6 deaths or fewer', games: [['loss', 'lich', 8, '6 deaths or fewer', false, .6, true, '2026-11-10'], ['win', 'lion', 5, '6 deaths or fewer', true, .4, true, '2026-11-10'],
+      ['loss', 'enigma', 13, '8 deaths or fewer', false, .85, true, '2026-11-09'], ['loss', 'crystal_maiden', 11, '8 deaths or fewer', false, .73, true, '2026-11-09'], ['win', 'lich', 7, '8 deaths or fewer', true, .43, false, '2026-11-08']]
+      .map(([result, hero, deaths, goal, met, warned_died, turbo, date]) => ({result, hero, deaths, goal, met, warned_died, turbo, date}))},
+    ready: {gsi: {ok: true, text: 'Dota is sending game data'}, screen: {ok: true, text: 'Seeing the minimap'}, voice: {ok: true, text: 'Voice is on'},
+      mic: {ok: true, text: 'Hold mouse4 to talk'}, overlay: {ok: true, text: 'Drawn over the game'}}};
+  W.alerts = []; W.attention.level = 'none';
+  W.skill = {points: 1, src: 'rule', next: {name: 'juggernaut_blade_fury', label: 'Blade Fury', slot: 'Q'},
+    then: [{name: 'juggernaut_healing_ward', label: 'Healing Ward', slot: 'W'}, {name: 'special_bonus_attack_speed_20', label: '+20 Attack Speed', slot: 'talent'}]};
+  const B = structuredClone(W);
+  // Scenarios cycle every 6 s (?mock&sc=<name> pins one). Each patch gets a fresh copy of B; clocks/`at`s are relative to its clock.
+  const MT = [['Bounty runes', 0, 240, 20], ['Power rune', 360, 120, 20], ['Wisdom shrine', 420, 420, 30], ['Lotus', 180, 180, 0], ['Stack', 53, 60, 4], ['Day/Night', 300, 300, 15]];
+  let seq = 0;
+  const att = (w, level, word, ic, text, id) => w.attention = {seq: ++seq, id: id || 'mock' + seq, level, word, icon: ic, text, since_clock: w.game.clock, sticky: true};
+  const al = (w, id, level, text, ago = 4, ttl = 30) => w.alerts.push({id, level, text, rule: id.split(':')[0], at: w.game.clock - ago, ttl});
+  const clk = (w, c) => { for (const h of Object.values(w.heroes)) if (num(h.last_seen)) h.last_seen += c - w.game.clock; w.voice.last.at_clock += c - w.game.clock; w.game.clock = c; };
+  const idle = (w, ok, text) => { w.game.state = null; w.game.clock = null; w.me = {role: w.me.role}; w.heroes = {}; w.src_age.gsi_s = ok ? .6 : null; Object.assign(w.goal, {now: 0, left: 6});
+    w.ready.gsi = {ok, text}; if (!ok) w.ready.screen = {ok: null, text: 'Waiting for Dota'}; };
+  const MS = [
+    ['wait', w => idle(w, null, 'Dota is not running')],   // with history: last game, 5-game strip, next goal, ready check
+    ['setup', w => idle(w, false, 'Dota is running but not sending data: add the launch option')],   // the only state with the launch-option chip
+    ['ready', w => idle(w, true, 'Ready')],
+    ['wait0', w => { idle(w, null, ''); for (const k of ['history', 'ready', 'coach', 'goal', 'brief', 'debrief']) delete w[k]; }],   // older server / first run: none of the v2 fields
+    ['brief', w => { w.game.state = 'DOTA_GAMERULES_STATE_PRE_GAME'; clk(w, -42); Object.assign(w.me, {level: 1, gold: 600, k: 0, d: 0, a: 0, lh: 0, x: -6700, y: -6300}); w.skill.points = 1;
+      Object.assign(w.goal, {now: 0, left: 6}); w.decision = null; w.voice.last = {text: 'One goal this game: six deaths or fewer.', cue: 'brief', at_clock: -44};
+      for (const h of Object.values(w.heroes)) Object.assign(h, {visible: !!h.ally, dead: false, x: -6700 + 300 * h.slot, y: -6300, last_xy: null, last_seen: null});
+      w.brief = {goal: 'One goal this game: six deaths or fewer.', lane: 'Farm first. Fight when your team is with you.', talk: 'Hold mouse4 to talk to me'}; }],
+    ['draft', w => { w.game.state = 'DOTA_GAMERULES_STATE_HERO_SELECTION'; w.game.clock = null; w.me = {role: w.me.role}; w.heroes = {};
+      w.draft_seen = {allies: ['juggernaut', 'necrolyte', null, 'lich', null], enemies: [null, 'antimage', null, null, null]};
+      w.draft = {role: num(w.settings.role) ? w.settings.role : null, src: 'pubs', picks: [['juggernaut', 'Juggernaut', 1, .58, 'you', 'you: 242 games, 58% win'], ['puck', 'Puck', 2, .55, 'you', 'you: 61 games, 55% win'], ['mars', 'Mars', 3, .54, 'you', 'you: 38 games, 54% win'],
+        ['tusk', 'Tusk', 4, .527, 'meta', 'meta: 52.7% in pubs'], ['dazzle', 'Dazzle', 5, .536, 'meta', 'meta: 53.6% in pubs']]
+        .map(([hero, name, role, wr, kind, why]) => ({hero, name, role, wr, kind, why}))}; }],
+    ['strategy', w => { MS.find(m => m[0] === 'draft')[1](w); w.game.state = 'DOTA_GAMERULES_STATE_STRATEGY_TIME';   // hero picked: the brief sits above the picks
+      w.brief = {goal: 'One goal this game: six deaths or fewer.', lane: 'Farm first. Fight when your team is with you.', talk: 'Hold mouse4 to talk to me'}; }],
+    ['laning', w => { clk(w, 225); w.me.level = 5; w.me.lh = 21; w.me.dn = 6; w.me.gold = 640; w.decision.danger.score = 1; w.decision.action = {choice: 'farm_lane', p: .72, probs: {}};
+      w.advice.headline = 'Last-hit, deny; Lion and Axe are both in lane'; w.voice.last = {text: 'Bounty runes soon.', cue: 'timer', at_clock: 220};
+      for (const k of ['lion', 'axe']) Object.assign(w.heroes[k], {visible: true, dead: false, x: -2500, y: -5600});
+      att(w, 'info', 'RUNE', 'rune', 'Bounty runes in 15s', 'T:Bounty runes:240'); al(w, 'T:Bounty runes:240', 'info', 'Bounty runes in 15s', 1, 20); }],
+    ['mid', w => { al(w, 'R2', 'info', '3 missing: farm closer to tower'); al(w, 'R5:3', 'info', 'Night: vision 800 - ward/avoid river', 40, 60);   // R2/R3 arrive as info: amber, never red
+      w.hud.mia = [{hero: 'npc_dota_hero_pudge', x: 2900, y: -3200, r: 2400}];
+      att(w, 'info', '3 MISSING', 'missing', '3 missing: farm closer to tower', 'R2'); }],
+    ['smoke', w => { clk(w, 1400); w.hud.threats = [{hero: 'npc_dota_hero_phantom_assassin', x: -2200, y: -2600, kind: 'smoke'}];
+      al(w, 'R3:1396', 'info', 'Possible smoke: phantom_assassin+pudge vanished at own_jungle', 4, 45); att(w, 'info', 'SMOKE?', 'smoke', 'Possible smoke: phantom_assassin+pudge vanished near you', 'R3:1396'); }],
+    ['quiet', w => { clk(w, 1320); w.coach.quiet = true; w.decision.danger.score = 1; w.decision.action = {choice: 'farm_jungle', p: .41, probs: {}}; }],   // QUIET chip; unsure decision -> phase default word
+    ['late', w => { clk(w, 2150); w.skill.points = 0; Object.assign(w.me, {level: 25, gold: 1900, buyback_cost: 2650, lh: 402, d: 6}); w.heroes.lion.dead = true; w.heroes.lion.respawn_s = 31;
+      Object.assign(w.goal, {now: 6, left: 0}); Object.assign(w.obj.rosh, {state: 'dead', killed_at: 1950, aegis_until: 2250}); al(w, 'R6', 'warn', 'Save buyback (need 750)');
+      att(w, 'warn', 'BUYBACK', 'buyback', 'Save buyback (need 750)', 'R6'); }],
+    ['fight', w => { clk(w, 1500); w.decision.danger.score = 4; w.decision.action = {choice: 'retreat', p: .71, probs: {retreat: .71, group: .2}};
+      Object.assign(w.heroes.lion, {x: -2600, y: -3600}); Object.assign(w.heroes.pudge, {visible: true, x: -3600, y: -3500});
+      w.hud.threats = [{hero: 'npc_dota_hero_lion', x: -2600, y: -3600, kind: 'seen'}, {hero: 'npc_dota_hero_pudge', x: -3600, y: -3500, kind: 'seen'}];
+      al(w, 'R1:1496', 'high', 'Gank: lion+pudge on you', 4, 20); w.alerts[0].dir = 'river'; att(w, 'high', 'GANK', 'danger', 'Gank: lion+pudge on you', 'R1:1496'); }],   // the "Map is quiet" line (19 s old) is hidden
+    ['dead', w => { clk(w, 1640); Object.assign(w.me, {alive: false, respawn_s: 38, d: 4}); w.decision.action = {choice: 'group', p: .66, probs: {}}; Object.assign(w.goal, {now: 4, left: 2});
+      w.debrief = {at: 1638, n: 4, cause: 'warned', line: 'I called it early. Next time, leave on the call.', by: ['npc_dota_hero_lion', 'npc_dota_hero_pudge'], called: {word: 'BACK', s_before: 9}, budget: 'Two left in your budget.'};
+      w.voice.last = {text: 'I called it early. Next time, leave on the call.', cue: 'debrief', at_clock: 1639};
+      w.hud.fight = {x: 500, y: -600, allies: 2, foes: 3}; att(w, 'info', 'DEAD 38s', 'dead', 'Dead: respawn in 38s', 'dead'); }],
+    ['dead0', w => { clk(w, 1640); Object.assign(w.me, {alive: false, respawn_s: 38}); delete w.debrief; delete w.goal; att(w, 'info', 'DEAD 38s', 'dead', 'Dead: respawn in 38s', 'dead'); }],   // older server: no debrief
+    ['rosh', w => { clk(w, 1700); Object.assign(w.obj.rosh, {state: 'maybe', killed_at: 1140, pit: 'bot'}); w.decision.rosh_taken.p = .64;
+      al(w, 'R4', 'warn', 'Possible Roshan'); att(w, 'warn', 'ROSH', 'rosh', 'Possible Roshan', 'R4'); }],
+    ['defend', w => { clk(w, 2010); const t = 'DEFEND bot T3 (93%): by terrorblade+lion, GLYPH ready, TP to defend'; w.me.d = 7; Object.assign(w.goal, {now: 7, left: -1});   // over budget: red counter; the % is stripped
+      al(w, 'R10:bot:3', 'high', t, 2, 30); att(w, 'high', 'DEFEND', 'danger', t, 'R10:bot:3'); }],
+    ['check', w => { clk(w, 1300); w.decision.danger.score = 1; w.skill.points = 0;   // what an older server still sends: the page must NOT show a CHECK ITEMS card
+      att(w, 'info', 'CHECK ITEMS', 'target', 'Click Phantom Assassin: check their items', 'check:phantom_assassin:1300'); }],
+    ['talk', w => { clk(w, 1350); w.decision.danger.score = 1;
+      Object.assign(w.talk, {stage: 'speaking', heard: 'where is their carry', reply: 'PA was last seen in the bot jungle 20 seconds ago. Farm top.'}); }],
+    ['post', w => { w.game.state = 'DOTA_GAMERULES_STATE_POST_GAME'; w.alerts = [];
+      w.postgame = {result: 'loss', hero: 'npc_dota_hero_juggernaut', role: 1, mode: 'normal', duration: 2470, kda: [7, 9, 5], gpm: 512, xpm: 601, lh: 288, dn: 9, buildings_lost: 9,
+        deaths: [[396, 'safe_lane', 0], [811, 'river', 1, 'Possible smoke'], [1190, 'enemy_jungle', 0], [1503, 'own_jungle', 1, 'Likely gank'], [1720, 'roshan', 1, 'Possible Roshan'], [2001, 'base', 0], [2180, 'base', 1, 'DEFEND bot T3'], [2290, 'base', 0], [2410, 'base', 0]]
+          .map(([clock, zone, warned, warning]) => ({clock, zone, warned: !!warned, warning: warning || null})),
+        scorecard: {alerts_by_rule: {R1: 12, R3: 4, R4: 3, R10: 6}, useful: 14, likely_false: 5, missed_deaths: 4, jev_calls: 310, llm_calls: 22, usd: .41},
+        highlights: ['Farm 512 GPM — above your 30% benchmark', 'Survived 3 smokes the coach called'],
+        lessons: ['Base lost while farming the far lane: answer DEFEND within 10 s', 'Died 4× with no warning in the enemy jungle — ward before entering'],
+        goals: ['TP to every T3 DEFEND call', 'Hold buyback gold after 30:00', '≤ 6 deaths'], report: 'recordings/20261109-230609/report.md',
+        goal: {text: '6 deaths or fewer', met: false, now: 9, target: 6}, one_lesson: 'Four of your nine deaths came at your own base after 33:00. When the base is next, stay with your team.',
+        one_praise: 'You left on the call three times and lived each time.', coach_misses: 'Five of your deaths had no call from me, and two of my smoke calls were wrong.', next_goal: '7 deaths or fewer'};
+      w.goal = null; }],
+    ['post0', w => { w.game.state = 'DOTA_GAMERULES_STATE_POST_GAME'; w.alerts = []; delete w.goal; delete w.history;   // older server: no goal, one_lesson, ...
+      w.postgame = {result: 'win', hero: 'npc_dota_hero_juggernaut', duration: 1510, kda: [9, 4, 11], deaths: [{clock: 396, warned: false}, {clock: 811, warned: true}],
+        scorecard: {useful: 9, likely_false: 2, missed_deaths: 1}, highlights: ['Survived 3 ganks the coach called'], lessons: ['Died once with no warning in the enemy jungle: ward before entering'], goals: ['6 deaths or fewer']}; }]];
+  const PIN = Q.get('sc');
+  let k = -1, c0s = null, ts = 0, n = 0;
+  const tick = () => {
+    const t = Date.now() / 1000, pi = MS.findIndex(m => m[0] === PIN), i = pi >= 0 ? pi : Math.floor((t - t0) / 6) % MS.length;
+    if (i !== k) { k = i; const st = W.settings; W = structuredClone(B); W.settings = st;
+      W.me.role_src = num(st.role) ? 'manual' : 'auto-hero'; if (num(st.role)) W.me.role = st.role;
+      W.game.mode_src = typeof st.turbo === 'boolean' ? 'manual' : 'auto'; if (typeof st.turbo === 'boolean') W.game.mode = st.turbo ? 'turbo' : 'normal';
+      MS[i][1](W); c0s = W.game.clock; ts = t; }
+    const dt = t - ts; n++;
+    W.t = t; lastMsg = Date.now(); W.llm.in_flight = (n % 40) < 6; W.jev.in_flight = n % 40 === 0;
+    if (num(c0s)) W.game.clock = c0s + dt;
+    const c = W.game.clock;
+    if (W.me.alive === false) W.me.respawn_s = Math.max(0, 38 - dt);
+    for (const h of Object.values(W.heroes)) if (!h.visible && !h.dead && num(h.last_seen)) { h.mia_s = c - h.last_seen; h.vanished_at = h.last_seen; h.reach_u = Math.min(330 * h.mia_s, 6000); }
+    W.timers = !num(c) ? [] : MT.filter(([nm]) => nm !== 'Stack' || W.me.role >= 4).map(([name, f, p, lead]) => ({name, lead, at_clock: c < f ? f : f + (Math.floor((c - f) / p) + 1) * p}));
+    W.timers.forEach(x => x.in_s = x.at_clock - c);
+    render();
+  };
+  tick(); setInterval(tick, 250);
+}
+</script>
+</body>
+</html>
