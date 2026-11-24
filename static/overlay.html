@@ -86,7 +86,7 @@ body{color:var(--ink);font:700 1rem/1.15 var(--f-ui);font-variant-numeric:tabula
 #mm .gh.cue image{filter:url(#fgc)}
 /* ENEMY RADAR: one icon per enemy, anchored at its centre (zero-size .en); every move and fade is a CSS transition, the pop runs once */
 #radar .en{position:fixed;width:0;height:0;transition:left .35s ease-out,top .35s ease-out,opacity .4s;--s:1;--g:0;--ch:1;--rg:0;--c:var(--warn)}
-#radar .en.seen{--c:var(--high)}#radar .en.tray,#radar .en.dead{--c:#3a4452}
+#radar .en.seen{--c:var(--high)}#radar .en.ally{--c:#4fd18b}#radar .en.tray,#radar .en.dead{--c:#3a4452}
 #radar img{position:absolute;left:0;top:0;width:3rem;height:3rem;border-radius:3px;transform:translate(-50%,-50%) scale(var(--s));box-shadow:0 0 0 2px var(--c),0 0 .6rem #000;
   filter:grayscale(var(--g)) brightness(calc(1 - var(--g) * .4));transition:transform .35s ease-out,filter .4s,box-shadow .4s}
 #radar .rot{position:absolute;left:0;top:0;transform:rotate(var(--a,0rad));opacity:var(--ch);transition:opacity .5s}
@@ -234,7 +234,7 @@ const sprite = h => {
 //                  fades into a dashed ring and the icon greys and shrinks. fog.py's p10 (could be on me within 10 s) keeps it big while it is a threat
 //  lost         -> its reach covers me and it is no threat, or it has no position (respawned, never seen): slides into the tray above the minimap, small and grey
 //  dead         -> tray, grey, respawn seconds
-const RUN = 330, GAP = .11, ago = a => !num(a) ? '' : a < 60 ? `${Math.floor(a / 5) * 5 || Math.floor(a)}s` : `${Math.floor(a / 60)}m`;   // u/s in fog; min rad between two edge icons
+const RUN = 330, ALLY_R = 5000, GAP = .11, ago = a => !num(a) ? '' : a < 60 ? `${Math.floor(a / 5) * 5 || Math.floor(a)}s` : `${Math.floor(a / 60)}m`;   // u/s in fog; min rad between two edge icons
 const cl = v => Math.max(0, Math.min(1, v));
 function radar(fog, me, r, sz) {
   const el = $('radar'), clock = W.game?.clock, ok = me.alive !== false && num(me.x) && num(me.y), kx = sz ? innerWidth / sz[0] : 1, ky = sz ? innerHeight / sz[1] : 1;
@@ -257,6 +257,16 @@ function radar(fog, me, r, sz) {
     if ((u >= 1 && t < .35) || age > 60) { tray.push({...o, mode: 'tray', txt: ago(age)}); continue; }
     edge.push({...o, mode: 'fog', a, s: .6 + .5 * pr, g: cl(u - t), op: .45 + .5 * pr, ch: 1 - u, rg: u, txt: ago(age)});
   }
+  // ALLIES (user 2026-11-24): teammates within ALLY_R on the same edge, green, smaller and steadier than enemies (no pop, no tray): which way help is
+  const mine = hshort(me.hero).replace(/\W/g, '');
+  if (ok) for (const [s, e] of Object.entries(W.heroes || {})) {
+    const h = hshort(s).replace(/\W/g, '');
+    if (!e || !e.ally || h === mine || e.dead || !num(e.x) || !num(e.y)) continue;
+    const dx = e.x - me.x, dy = e.y - me.y, d = Math.hypot(dx, dy);
+    if (d < 1 || d > ALLY_R) continue;
+    const near = cl(1 - (d - 1200) / (ALLY_R - 1200));
+    edge.push({h, slot: 0, ally: true, mode: 'ally', a: Math.atan2(-dy, dx), s: .5 + .25 * near, g: 0, op: .5 + .35 * near, ch: 1, rg: 0, txt: ''});
+  }
   edge.sort((p, q) => p.a - q.a).forEach((p, i, A) => { if (i && p.a - A[i - 1].a < GAP) p.a = A[i - 1].a + GAP; });   // side by side, never on top of each other
   for (const p of edge) { p.x = innerWidth / 2 + Math.cos(p.a) * innerWidth * .44; p.y = Math.max(.12, Math.min(.74, .47 + Math.sin(p.a) * .37)) * innerHeight; }
   for (const p of tray) {   // fixed slots in top-bar order along the minimap's top edge (bottom-right corner when its geometry is unknown)
@@ -265,7 +275,7 @@ function radar(fog, me, r, sz) {
   }
   const now = performance.now();
   for (const p of [...edge, ...tray]) {
-    const n = node(`r:${p.h}`, () => born(mkNode(el, `<div class="rot"><svg class="chev" viewBox="0 0 24 24"><path d="M5 3l14 9-14 9 4-9z"/></svg></div><i class="ring"></i><img src="${CDN}${p.h}.png" alt="" onerror="this.parentNode.hidden=true"><span></span>`)));
+    const n = node(`r:${p.ally ? 'a:' : ''}${p.h}`, () => born(mkNode(el, `<div class="rot"><svg class="chev" viewBox="0 0 24 24"><path d="M5 3l14 9-14 9 4-9z"/></svg></div><i class="ring"></i><img src="${CDN}${p.h}.png" alt="" onerror="this.parentNode.hidden=true"><span></span>`)));
     if (p.mode === 'seen' && n._m !== 'seen') n._pop = now;   // came into sight (also: first seen this match)
     n._m = p.mode;
     const cls = `en ${p.mode}${now - (n._pop || -1e9) < 1400 ? ' pop' : ''}`;
@@ -435,7 +445,7 @@ if (Q.has('mock')) {
   const dark = a => { const i = DARK.findIndex(k => a <= k[0]), p = DARK[i - 1], q = DARK[i]; return i < 0 ? .08 : !p ? .85 : p[1] + (q[1] - p[1]) * (a - p[0]) / (q[0] - p[0]); };
   Object.assign(CYC, {
     radar: FW([G('death_prophet', 3, -1300, -300, .55, {p10: .5, tier: 2}), G('mirana', 25, 4500, 3800, .12, {p10: .02})], {heroes: {...FOES, silencer: {team: 'dire', ally: false, visible: true, x: -1500, y: -1900, slot: 0},
-      slark: {team: 'dire', ally: false, visible: true, x: 3000, y: 1500, slot: 1}, dragon_knight: {team: 'dire', ally: false, visible: false, dead: true, slot: 2}, mirana: {...FOES.mirana, slot: 4}, death_prophet: {...FOES.death_prophet, slot: 3}}}),   // near + far in sight, fresh close fog, old far fog, dead
+      slark: {team: 'dire', ally: false, visible: true, x: 3000, y: 1500, slot: 1}, lich: {team: 'radiant', ally: true, visible: true, x: -4200, y: -1500}, dragon_knight: {team: 'dire', ally: false, visible: false, dead: true, slot: 2}, mirana: {...FOES.mirana, slot: 4}, death_prophet: {...FOES.death_prophet, slot: 3}}}),   // near + far in sight, fresh close fog, old far fog, dead
     fog_calm: FW([]),   // all enemies in sight or dead: nothing
     fog_fresh: FW([...FRESH, G('silencer', 1.5, -1550, -310, .9, {p10: .68})]),   // ghosts at 4 s and 7 s; 9 s = chip only; 1.5 s = nothing yet
     fog_lit: FW([G('dragon_knight', 20, -1200, -2600, .36, {p10: .09})]),   // vanished inside my team's vision: the ghost lasts
