@@ -571,8 +571,8 @@ def _helper_msg(W, m):
             T["t_up"] = time.time()
         _heard(W, m["final"])
     elif "chunk" in m:
-        if mode_of(W["settings"]) == "off" or not E("OPENAI_API_KEY") or T["usd"] >= MAX_USD:
-            Path(m["chunk"]).unlink(missing_ok=True)  # muted / no key / over budget: the audio never leaves the machine
+        if mode_of(W["settings"]) == "off" or not E("OPENAI_API_KEY") or llm.PAUSED or T["usd"] >= MAX_USD:   # AI off = no cloud speech either
+            Path(m["chunk"]).unlink(missing_ok=True)  # muted / no key / AI off / over budget: the audio never leaves the machine
             _warn("nokey", "listen: on-device speech unavailable and no OpenAI key/budget: voice input can't be transcribed")
             if T["stage"] == "transcribing":
                 _stage("done")

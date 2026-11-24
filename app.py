@@ -247,7 +247,7 @@ def postgame_tick(W):
                 world.W["postgame"] = postgame.summary(rep)
         rec.event("postgame", matchid=mid, result=rep.get("result"), path=rep.get("path"), error=rep.get("error"))
         log.info("postgame %s: %s", mid, rep.get("path") or rep.get("error"))
-        if rep.get("path") and dirs:
+        if rep.get("path") and dirs and not llm.PAUSED:   # the AI switch covers the paid review too
             try:  # the deep learning review (one large Claude call, ~1-3 min); compaction below waits for it
                 rv = review.review(dirs)
                 log.info("review %s: %s", mid, rv)
@@ -309,6 +309,19 @@ async def lifespan(app):
 
 
 app = FastAPI(lifespan=lifespan)
+LOCAL_HOSTS = ("127.0.0.1", "localhost", "[::1]")
+
+
+@app.middleware("http")
+async def local_only(req: Request, call_next):
+    """The server binds 127.0.0.1, but a web page in the browser can still reach it: refuse a foreign Host header (DNS rebinding)
+    and an /api write that is not JSON (a cross-site form or text/plain post skips the CORS preflight). /gsi has its own token."""
+    host = (req.headers.get("host") or "").rsplit(":", 1)[0] if not (req.headers.get("host") or "").startswith("[") else "[::1]"
+    if host not in LOCAL_HOSTS:
+        return JSONResponse({"ok": False, "error": "local requests only"}, 403)
+    if req.method == "POST" and req.url.path.startswith("/api/") and not req.headers.get("content-type", "").startswith("application/json"):
+        return JSONResponse({"ok": False, "error": "JSON only"}, 415)
+    return await call_next(req)
 
 
 @app.post("/gsi")

@@ -16,7 +16,22 @@ Fogwatch shows where the five enemy heroes are, or were last seen, as icons arou
 4. System Settings → Privacy & Security → Screen Recording: allow Terminal, then reopen `start.command`.
 5. Play. The radar appears at the horn and leaves at the end screen.
 
-**Optional AI coach (your own keys, your own bill):** open the dashboard menu → *AI coach*, paste an OpenAI and/or Jev key and switch *AI on*. It adds a game plan, advice and quick decisions, about $0.02 per game. An Anthropic key adds a post-game review by Claude Opus, about $0.65 per game. Keys are saved only on your computer in `./.env` (see `.env.example`). With AI off, no paid call is ever made.
+### What you get
+
+- **Enemy radar** (free, always on): all five enemy heroes as icons on the edge of your screen, pointing the way you'd have to look. Red = in sight (bigger when close, pops in when it appears), amber = where it was last seen (with seconds since), fading into a dashed ring and then into a grey tray above the minimap once it could be anywhere.
+- **One arrow per direction**: heroes coming from the same side share one arrow; it pulses when a gank looks close.
+- **No clutter**: an enemy right next to you (already on your screen) gets no icon; nothing is drawn inside the minimap; everything clears at the end screen.
+- **Teammates** nearby in green, smaller and calmer.
+- **Dashboard** at `http://127.0.0.1:3939`: draft, timers, alerts, settings, and the AI switch with your keys.
+- **Optional AI coach and voice** with your own keys (below).
+
+### Safety and privacy
+
+- Reads only your own screen (the minimap and HUD) and Valve's official Game State Integration. It never reads game memory, never presses a key or moves the mouse, and changes no game files except the one GSI config file.
+- Everything runs on your Mac. The server listens on `127.0.0.1` only and refuses requests from other hosts or non-JSON writes from web pages.
+- With AI off (the default) nothing leaves your computer except downloads of public hero data and icons, and a lookup of your own public match history on OpenDota (for the post-game report).
+
+**Optional AI coach (your own keys, your own bill):** open the dashboard menu → *AI coach*, paste an OpenAI and/or Jev key and switch *AI on*. It adds a game plan, advice and quick decisions, about $0.02 per game. An Anthropic key adds a post-game review by Claude Opus, about $0.65 per game. Keys are saved only on your computer in `./.env` (see `.env.example`). With AI off, no paid call is ever made: no advice, no decisions, no cloud speech-to-text and no review.
 
 ## Setup details (once)
 
