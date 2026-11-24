@@ -238,7 +238,7 @@ const sprite = h => {
 //                  fades into a dashed ring and the icon greys and shrinks. fog.py's p10 (could be on me within 10 s) keeps it big while it is a threat
 //  lost         -> its reach covers me and it is no threat, or it has no position (respawned, never seen): slides into the tray above the minimap, small and grey
 //  dead         -> tray, grey, respawn seconds
-const RUN = 330, ALLY_R = 5000, GAP = .11, MERGE = .26, DANGER_D = 1600, ago = a => !num(a) ? '' : a < 60 ? `${Math.floor(a / 5) * 5 || Math.floor(a)}s` : `${Math.floor(a / 60)}m`;   // u/s in fog; min rad between two edge icons
+const RUN = 330, ALLY_R = 5000, GAP = .11, MERGE = .26, DANGER_D = 1600, ON_SCREEN = [900, 1100], onScr = new Set(), ago = a => !num(a) ? '' : a < 60 ? `${Math.floor(a / 5) * 5 || Math.floor(a)}s` : `${Math.floor(a / 60)}m`;   // u/s in fog; min rad between two edge icons
 const cl = v => Math.max(0, Math.min(1, v));
 function radar(fog, me, r, sz) {
   const el = $('radar'), clock = W.game?.clock, ok = me.alive !== false && num(me.x) && num(me.y), kx = sz ? innerWidth / sz[0] : 1, ky = sz ? innerHeight / sz[1] : 1;
@@ -252,6 +252,8 @@ function radar(fog, me, r, sz) {
     const seen = e.visible && num(e.x) && num(e.y), x = seen ? e.x : f?.x, y = seen ? e.y : f?.y, age = seen ? 0 : f?.age, p10 = seen ? 0 : f?.p10 || 0;
     if (!ok || !num(x) || !num(y)) { tray.push({...o, mode: 'tray', txt: ago(age)}); continue; }
     const dx = x - me.x, dy = y - me.y, d = Math.hypot(dx, dy), a = Math.atan2(-dy, dx), near = cl(1 - (d - 1200) / 4800);   // 1 within 1200 u, 0 from 6000 u
+    if (seen && (d <= ON_SCREEN[0] || onScr.has(h) && d <= ON_SCREEN[1])) { onScr.add(h); continue; }   // right next to me = on my screen: no icon over the fight (user 2026-11-24)
+    onScr.delete(h);   // ponytail: distance only (the camera box on the minimap is not read yet); 900 u is inside the view while the camera follows the hero
     if (seen) {
       edge.push({...o, mode: 'seen', a, d, s: .7 + .55 * near, g: 0, op: .55 + .45 * near, ch: 1, rg: 0, txt: '', hot: d <= DANGER_D});
       if (d < wd) { wd = d; worst = {a, n: 1, m: 1}; }
