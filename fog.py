@@ -67,7 +67,8 @@ def build(heroes, me, c, vis, st):
         if e["visible"] or e.get("dead") or not e.get("last_xy") or e.get("mia_s") is None:
             st.pop(s, None)
             continue
-        src = "respawn" if e.get("resp_at") is not None else "hint" if e.get("hint_at") is not None else "seen"
+        # illusion: the last copy in sight died with no kill event (or its corpse is still waiting for one): no position, like a respawn (user 2026-11-25)
+        src = "respawn" if e.get("resp_at") is not None else "illusion" if e.get("illusion") or e.get("mark_fresh") else "hint" if e.get("hint_at") is not None else "seen"
         age, (x, y) = e["mia_s"], e["last_xy"]
         h, ev = st.get(s), c - age
         if h is None or h["src"] != src or abs(h["t0"] - ev) > SAME_S:  # new evidence = new unseen stretch
@@ -78,10 +79,10 @@ def build(heroes, me, c, vis, st):
             h["ev"], h["age"] = ev, age
         age = h["age"] = max(h["age"], age, 0.0)  # (0: right after a sighting the stepped-back clock reads mia_s -0.1)
         conf = 0.0
-        if src != "respawn":  # a mark needs a real sighting or a summon; the overlay's 1-3 s fade-in is what hides flicker
+        if src not in ("respawn", "illusion"):  # a mark needs a real sighting or a summon; the overlay's 1-3 s fade-in is what hides flicker
             conf = _interp(CONF_LIT if lit(vis, x, y) else CONF_DARK, age)
             conf = h["conf"] = min(h["conf"], HINT_CAP if src == "hint" else 1.0, conf)  # never rises within a stretch: a ghost cannot come back
-        p = odds(fight, math.dist((x, y), pos), age) if ok else 0.0
+        p = odds(fight, math.dist((x, y), pos), age) if ok and src != "illusion" else 0.0
         pc = p if age >= CUE_MIN_S else 0.0  # the cue state machine is blind to the flicker window; p10 itself is published as is
         if not ok:
             h.update(soft=False, hard=False, up=None, low=None, hlow=None)
@@ -101,14 +102,14 @@ def build(heroes, me, c, vis, st):
                 h["hlow"] = None if pc >= HARD_OFF else (h["hlow"] if h["hlow"] is not None else c)
                 if h["hlow"] is not None and c - h["hlow"] >= RELEASE_S:
                     h["hard"] = False
-        tier = 0 if src == "respawn" else 2 if h["hard"] else 1 if h["soft"] else 0  # a respawned hero has no position to point at
+        tier = 0 if src in ("respawn", "illusion") else 2 if h["hard"] else 1 if h["soft"] else 0  # a respawned hero has no position to point at
         if tier and h["cue"] is None:
             h["cue"] = c
         if (h["shown"] and not tier) or (h["cue"] is not None and c - h["cue"] >= LIFE_S):
             h["done"] = True  # one cue per unseen stretch: once it has ended (bar ran out, odds fell, I died) it stays off. Latched: the live clock steps back
         if h["done"]:
             tier = 0
-        out.append({"hero": s, "slot": order.index(s) % 5, "age": round(age, 1), "x": None if src == "respawn" else round(x), "y": None if src == "respawn" else round(y),
+        out.append({"hero": s, "slot": order.index(s) % 5, "age": round(age, 1), "x": None if src in ("respawn", "illusion") else round(x), "y": None if src in ("respawn", "illusion") else round(y),
                     "conf": round(conf, 2), "src": src, "p10": round(p, 2), "tier": tier, "ttl": 0})
         if tier:
             out[-1]["ttl"] = h["ttl"] = min(h["ttl"], max(.01, round(1 - (c - h["cue"]) / LIFE_S, 2)))
@@ -141,6 +142,8 @@ def demo():
     assert build({"lion": H(mia_s=5.0, vanished_at=None)}, me, 100.0, [], st)[0]["conf"] > 0    # a brief sighting (< 2 s visible) is still a sighting
     r = build({"lion": H(mia_s=5.0, resp_at=95.0, last_xy=[7000, 6400])}, me, 100.0, [], st)[0]
     assert r["src"] == "respawn" and r["x"] is None and r["conf"] == 0 and r["tier"] == 0, r
+    r = build({"lion": H(mia_s=5.0, last_xy=[1000, 0], illusion=True)}, me, 100.0, [], {})[0]   # its last copy in sight was an illusion that died
+    assert r["src"] == "illusion" and r["x"] is None and r["p10"] == 0 and r["tier"] == 0, r
     hint = build({"lion": H(mia_s=3.0, vanished_at=None, hint_at=100.0)}, me, 100.0, [], st)[0]
     assert hint["src"] == "hint" and 0 < hint["conf"] <= HINT_CAP, hint
     st = {}

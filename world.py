@@ -175,7 +175,7 @@ def _vis(s, e, src, on, x=None, y=None, clock=None):
     v[src] = on
     if on and (src == "gsi" or not v["gsi"]):
         e.update(x=x, y=y, src=src, last_seen=clock, last_xy=[x, y], mia_s=0, reach_u=0, vanished_at=None, dead=False, dead_until=None)
-        for k in ("resp_at", "died_at", "hint", "hint_at"):
+        for k in ("resp_at", "died_at", "hint", "hint_at", "illusion"):
             e.pop(k, None)
     was, e["visible"] = e["visible"], v["gsi"] or v["cv"]
     if e["visible"] and not was:
@@ -345,6 +345,8 @@ def _merge_gsi(body, now, demo):
                     e_pop()
                 elif clock - first > 2.5:
                     e["death_mark"] = True  # an illusion's corpse (or an old one coming back into view): not a death
+                    if e["mark_fresh"]:  # the copy we were following died in front of us with no kill event: an illusion, its spot says nothing about the hero
+                        e["illusion"] = True
                     e_pop()
         for s, e in W["heroes"].items():
             if s == hero or s in seen or s in gone:

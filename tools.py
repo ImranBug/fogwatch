@@ -816,8 +816,9 @@ def _fog_checks(check):
         step(c, [foe("lion", 3000, 0)])
     fs = [step(c, [foe("lion", 3300, 200, 0)])[1] for c in range(603, 612)]
     e = world.W["heroes"]["lion"]
-    check("fog: a corpse marker without a kill event is not a death: the entry stays, on the last real spot", world.W["_"].get("ek_on") is True and not e["dead"]
-          and all("lion" in f for f in fs) and e["last_xy"] == [3000, 0] and fs[-1]["lion"]["src"] == "seen", f"dead {e['dead']}, last_xy {e['last_xy']}, {fs[-1].get('lion')}")
+    check("fog: a corpse marker without a kill event is not a death but an illusion's: the entry stays, with no spot (the copy we followed was not the hero)",
+          world.W["_"].get("ek_on") is True and not e["dead"] and e.get("illusion")
+          and all("lion" in f for f in fs) and (fs[-1]["lion"]["src"], fs[-1]["lion"]["x"], fs[-1]["lion"]["tier"]) == ("illusion", None, 0), f"dead {e['dead']}, last_xy {e['last_xy']}, {fs[-1].get('lion')}")
 
     world.reset()  # 7. the kill goes to the hero whose marker it is, not to the one that walked off 2 s earlier
     for c in (700, 701):
@@ -882,7 +883,7 @@ def _fog_checks(check):
     step(762, [foe("sven", 2500, 0, 0)], [kill(703, 6)])  # sven's corpse in front of me, and only a 59 s old event (GSI back after a gap)
     _, f = step(763, [foe("sven", 2500, 0, 0)], [kill(703, 6)])
     check("death rules: a marker of a hero out of sight claims a kill event only once it is 1.5 s old; a marker never claims an old event",
-          wait == [False, False, True] and f.get("sven", {}).get("src") == "seen" and "died_at" not in world.W["heroes"]["sven"], f"lion dead at 0 / 1 / 2 s {wait}, sven {f.get('sven')}")
+          wait == [False, False, True] and f.get("sven", {}).get("src") == "illusion" and "died_at" not in world.W["heroes"]["sven"], f"lion dead at 0 / 1 / 2 s {wait}, sven {f.get('sven')}")
 
     world.reset()  # 8. a fresh enemy summon: a hint entry, never solid; a sighting ends the hint
     ward = {"xpos": 1000, "ypos": 1000, "image": "minimap_plaincircle", "team": 3, "unitname": "npc_dota_venomancer_plague_ward", "visionrange": 800}

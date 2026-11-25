@@ -93,7 +93,12 @@ body{color:var(--ink);font:700 1rem/1.15 var(--f-ui);font-variant-numeric:tabula
 #radar .chev{position:absolute;left:calc(1.6rem * var(--s) + .1rem);top:-1rem;width:2rem;height:2rem;fill:var(--c);stroke:#000;stroke-width:1;filter:drop-shadow(0 0 .3rem #000)}
 #radar .ring{position:absolute;left:0;top:0;width:3.8rem;height:3.8rem;border:2px dashed var(--c);border-radius:50%;transform:translate(-50%,-50%) scale(var(--s));opacity:var(--rg);transition:opacity .5s,transform .35s}
 #radar span{position:absolute;left:0;top:calc(1.5rem * var(--s) + .15rem);transform:translateX(-50%);font-size:.85rem;color:var(--ink-2);text-shadow:0 1px 2px #000;white-space:nowrap;text-transform:none;letter-spacing:0}
-#radar .en.pop img{animation:rpop .45s cubic-bezier(.2,1.6,.4,1) both,rflash .5s ease-out .45s 2}
+#radar .en.pop img{animation:rpop .45s cubic-bezier(.2,1.6,.4,1) both,rflash .5s ease-out .45s 5}
+#radar .en.big img{animation:rbig 2s cubic-bezier(.2,1.2,.4,1) both,rflash .5s ease-out .15s 6}   /* out of fog and close (user 2026-11-25): huge first, then settles; red glow ~3 s */
+@keyframes rbig{0%{transform:translate(-50%,-50%) scale(calc(var(--s) * 3.2));opacity:0}10%{transform:translate(-50%,-50%) scale(calc(var(--s) * 2.6));opacity:1}55%{transform:translate(-50%,-50%) scale(calc(var(--s) * 2.4))}}
+#radar .en.ally{transition:left 1.2s ease-out,top 1.2s ease-out,opacity 1s}   /* teammates (user 2026-11-25): small, round, dull green, no arrow, slow moves: never grab the eye */
+#radar .en.ally img{border-radius:50%;filter:grayscale(.7) sepia(.6) hue-rotate(55deg) saturate(1.3) brightness(.8)}
+#mm .ls circle{fill:rgba(16,21,28,.8);stroke:var(--warn);stroke-width:1.5}#mm .ls{transition:opacity .6s}
 @keyframes rpop{from{transform:translate(-50%,-50%) scale(calc(var(--s) * 2.4));opacity:0}}
 @keyframes rflash{from{filter:drop-shadow(0 0 .5rem var(--high)) drop-shadow(0 0 1.2rem var(--high))}}
 #radar .en.hot .chev{transform-origin:30% 50%;animation:rpulse .5s ease-in-out infinite alternate}   /* allowed loop: only while a gank looks close */
@@ -106,12 +111,12 @@ body{color:var(--ink);font:700 1rem/1.15 var(--f-ui);font-variant-numeric:tabula
 .arw.fog.t1 .lab{padding:.15rem .3rem;box-shadow:0 0 0 1px #07090c}.arw.fog.t1 .lab img{width:1.9rem;height:1.9rem}
 .arw .drain{position:absolute;left:3px;right:0;bottom:0;height:4px;background:rgba(255,255,255,.14)}.arw .drain b{display:block;height:100%;background:var(--c)}
 .arw.fog.t1 .drain{display:none}
-@media (prefers-reduced-motion: reduce){#radar .en.pop img,#radar .en.hot .chev,.pill,.pill.big,.arw .chev,.arw .lab.seen,.arw.fog.go .chev,#mm .ping{animation:none}#glow,#mm .gh,.chip{transition:none}}
+@media (prefers-reduced-motion: reduce){#radar .en.pop img,#radar .en.big img,#radar .en.hot .chev,.pill,.pill.big,.arw .chev,.arw .lab.seen,.arw.fog.go .chev,#mm .ping{animation:none}#glow,#mm .gh,.chip{transition:none}}
 </style>
 </head>
 <body>
 <div id="fx"><div id="glow"></div><div id="arrows"></div><svg id="mm"></svg><div id="radar"></div></div>
-<svg width="0" height="0" style="position:fixed"><filter id="fgd" color-interpolation-filters="sRGB"><feColorMatrix type="saturate" values=".3"/></filter><filter id="fgc" color-interpolation-filters="sRGB"><feColorMatrix type="saturate" values=".85"/></filter></svg>
+<svg width="0" height="0" style="position:fixed"><clipPath id="ghc" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><filter id="fgd" color-interpolation-filters="sRGB"><feColorMatrix type="saturate" values=".3"/></filter><filter id="fgc" color-interpolation-filters="sRGB"><feColorMatrix type="saturate" values=".85"/></filter></svg>
 <div id="mic" hidden><span class="dot"></span><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span id="micl"></span></div>
 <div id="hud" class="left calm">
   <div id="pill" class="pill" hidden></div>
@@ -165,11 +170,14 @@ const CDN = 'https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react
 const hshort = h => String(h || '').replace('npc_dota_hero_', '');
 const KCOL = {seen: 'var(--high)', smoke: 'var(--warn)', missing: 'var(--warn)', fight: 'var(--ink)'};   // a seen enemy is red; smoke / missing are guesses: amber; fight-join is ink
 // world (GSI x,y) -> overlay px over the real minimap: affine A gives minimap-crop px (crop is resampled square), then frame px, then window px
+// The capture of a fullscreen Dota window includes its hidden title bar: the picture is shifted down by it and the bottom cut off, so the minimap
+// rect reaches below the frame. On screen everything sits that much higher (user 2026-11-25: marks 44 px too low on a 2560x1440 display)
+const mmDy = (r, sz) => Math.max(0, r[1] + r[3] - sz[1]);
 function mmPt(x, y) {
   const cv = W.cv || {}, A = cv.A, r = cv.minimap_rect, sz = cv.size;
   if (!cv.affine_ok || !A || !r || !sz || !num(x) || !num(y)) return null;
   const u = A[0][0] * x + A[0][1] * y + A[0][2], v = A[1][0] * x + A[1][1] * y + A[1][2];
-  return [(r[0] + u) * innerWidth / sz[0], (r[1] + v * r[3] / r[2]) * innerHeight / sz[1]];
+  return [(r[0] + u) * innerWidth / sz[0], (r[1] + v * r[3] / r[2] - mmDy(r, sz)) * innerHeight / sz[1]];
 }
 const mmScale = () => { const cv = W.cv || {}; return cv.A && cv.size ? Math.hypot(cv.A[0][0], cv.A[0][1]) * innerWidth / cv.size[0] : 0; };
 // LEGACY (a server without hud.fog): today's arrows and marks, verbatim. coach.py restarts a crashed overlay, which loads this file against the
@@ -238,7 +246,7 @@ const sprite = h => {
 //                  fades into a dashed ring and the icon greys and shrinks. fog.py's p10 (could be on me within 10 s) keeps it big while it is a threat
 //  lost         -> its reach covers me and it is no threat, or it has no position (respawned, never seen): slides into the tray above the minimap, small and grey
 //  dead         -> tray, grey, respawn seconds
-const RUN = 330, ALLY_R = 5000, GAP = .11, MERGE = .26, DANGER_D = 1600, ON_SCREEN = [900, 1100], onScr = new Set(), ago = a => !num(a) ? '' : a < 60 ? `${Math.floor(a / 5) * 5 || Math.floor(a)}s` : `${Math.floor(a / 60)}m`;   // u/s in fog; min rad between two edge icons
+const RUN = 330, ALLY_R = [4500, 5500], allyOn = new Set(), GAP = .11, MERGE = .26, DANGER_D = 1600, ON_SCREEN = [900, 1100], onScr = new Set(), ago = a => !num(a) ? '' : a < 60 ? `${Math.floor(a / 5) * 5 || Math.floor(a)}s` : `${Math.floor(a / 60)}m`;   // u/s in fog; min rad between two edge icons
 const cl = v => Math.max(0, Math.min(1, v));
 function radar(fog, me, r, sz) {
   const el = $('radar'), clock = W.game?.clock, ok = me.alive !== false && num(me.x) && num(me.y), kx = sz ? innerWidth / sz[0] : 1, ky = sz ? innerHeight / sz[1] : 1;
@@ -269,9 +277,9 @@ function radar(fog, me, r, sz) {
     const h = hshort(s).replace(/\W/g, '');
     if (!e || !e.ally || h === mine || e.dead || !num(e.x) || !num(e.y)) continue;
     const dx = e.x - me.x, dy = e.y - me.y, d = Math.hypot(dx, dy);
-    if (d < 1 || d > ALLY_R) continue;
-    const near = cl(1 - (d - 1200) / (ALLY_R - 1200));
-    edge.push({h, slot: 0, ally: true, mode: 'ally', d, a: Math.atan2(-dy, dx), s: .5 + .25 * near, g: 0, op: .5 + .35 * near, ch: 1, rg: 0, txt: ''});
+    if (d < 1 || d > ALLY_R[allyOn.has(h) ? 1 : 0]) { allyOn.delete(h); continue; }   // in at 4500 u, out at 5500 u: no blinking at the border
+    allyOn.add(h);
+    edge.push({h, slot: 0, ally: true, mode: 'ally', d, a: Math.atan2(-dy, dx), s: .42, g: 0, op: .4, ch: 0, rg: 0, txt: ''});
   }
   // GROUPS (user 2026-11-24): heroes of one side within MERGE rad of each other share ONE arrow, their icons side by side along the edge. An enemy
   // arrow pulses while a gank looks close: one in sight within DANGER_D, a fog hero fog.py rates likely on me within 10 s, or 2+ enemies in sight together.
@@ -284,7 +292,7 @@ function radar(fog, me, r, sz) {
   groups.sort((p, q) => p.a - q.a).forEach((g, i, A) => { const gap = GAP * (g.m.length + (i ? A[i - 1].m.length : 0)) / 2; if (i && g.a - A[i - 1].a < gap) g.a = A[i - 1].a + gap; });
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
   for (const g of groups) {
-    const ax = innerWidth / 2 + Math.cos(g.a) * innerWidth * .44, ay = Math.max(.12, Math.min(.74, .47 + Math.sin(g.a) * .37)) * innerHeight;
+    const ax = innerWidth / 2 + Math.cos(g.a) * innerWidth * (g.ally ? .49 : .44), ay = (g.ally ? Math.max(.07, Math.min(.8, .47 + Math.sin(g.a) * .42)) : Math.max(.12, Math.min(.74, .47 + Math.sin(g.a) * .37))) * innerHeight;   // allies on the outer rim
     const sp = 3.3 * rem * Math.max(...g.m.map(p => p.s)), tx = -Math.sin(g.a), ty = Math.cos(g.a);
     const seen = g.m.some(p => p.mode === 'seen'), hot = !g.ally && (g.m.some(p => p.hot) || g.m.filter(p => p.mode === 'seen' && p.d <= 3000).length >= 2);
     g.m.sort((p, q) => q.s - p.s).forEach((p, i) => {   // the most prominent in the middle, under the arrow
@@ -292,19 +300,19 @@ function radar(fog, me, r, sz) {
       Object.assign(p, {a: g.a, x: Math.max(.04 * innerWidth, Math.min(.96 * innerWidth, ax + tx * k * sp)), y: Math.max(.1 * innerHeight, Math.min(.78 * innerHeight, ay + ty * k * sp))});   // on screen, below the top bar
     });
     const L = g.m[0];
-    Object.assign(L, {ch: Math.max(...g.m.map(p => p.ch)), hot, col: g.ally ? '' : seen ? 'var(--high)' : 'var(--warn)'});
+    Object.assign(L, {ch: g.ally ? 0 : Math.max(...g.m.map(p => p.ch)), hot, col: g.ally ? '' : seen ? 'var(--high)' : 'var(--warn)'});
     for (const p of g.m.slice(1)) p.ch = 0;
   }
   for (const p of tray) {   // fixed slots in top-bar order along the minimap's top edge (bottom-right corner when its geometry is unknown)
     Object.assign(p, {s: .55, g: .9, op: p.mode === 'dead' ? .4 : .6, ch: 0, rg: 0, a: 0});
-    p.x = r ? (r[0] + (p.slot + .5) * r[2] / 5) * kx : innerWidth * (.82 + p.slot * .035); p.y = r ? r[1] * ky - 22 : innerHeight * .74;
+    p.x = r ? (r[0] + (p.slot + .5) * r[2] / 5) * kx : innerWidth * (.82 + p.slot * .035); p.y = r ? (r[1] - mmDy(r, sz)) * ky - 22 : innerHeight * .74;
   }
   const now = performance.now();
   for (const p of [...edge, ...tray]) {
     const n = node(`r:${p.ally ? 'a:' : ''}${p.h}`, () => born(mkNode(el, `<div class="rot"><svg class="chev" viewBox="0 0 24 24"><path d="M5 3l14 9-14 9 4-9z"/></svg></div><i class="ring"></i><img src="${CDN}${p.h}.png" alt="" onerror="this.parentNode.hidden=true"><span></span>`)));
-    if (p.mode === 'seen' && n._m !== 'seen') n._pop = now;   // came into sight (also: first seen this match)
+    if (p.mode === 'seen' && n._m !== 'seen') { n._pop = now; n._big = p.d <= 3000; }   // came into sight (also: first seen this match); close = big entrance
     n._m = p.mode;
-    const cls = `en ${p.mode}${now - (n._pop || -1e9) < 1400 ? ' pop' : ''}${p.hot ? ' hot' : ''}`;
+    const cls = `en ${p.mode}${now - (n._pop || -1e9) < 3200 ? n._big ? ' big' : ' pop' : ''}${p.hot ? ' hot' : ''}`;
     if (put(n, '_c', cls)) n.className = cls;
     const css = `left:${Math.round(p.x)}px;top:${Math.round(p.y)}px;--a:${p.a.toFixed(2)}rad;--s:${p.s.toFixed(2)};--g:${p.g.toFixed(1)};--ch:${p.ch.toFixed(1)};--rg:${p.rg.toFixed(1)}${p.col ? ';--c:' + p.col : ''}`;
     if (put(n, '_css', css)) {
@@ -324,6 +332,15 @@ function fogLayer(hud, fog, me) {
   for (const [s, e] of Object.entries(W.heroes || {})) if (e && !e.ally && e.team) sprite(s);
   fog = fog.filter(e => e && e.hero && num(e.age)).map(e => ({...e, hero: hshort(e.hero).replace(/\W/g, '')}));
   const rd = W.game?.state === 'DOTA_GAMERULES_STATE_GAME_IN_PROGRESS' ? radar(fog, me, geo ? r : null, sz) : null;   // from the horn only   // ENEMY RADAR replaces the minimap ghosts and the strip (user 2026-11-24: nothing of ours inside the minimap)
+  // LAST SEEN on the minimap (user 2026-11-25): each enemy in fog at the spot it vanished, dulled, fading with time; it leaves when the hero is seen
+  if (geo && W.game?.state === 'DOTA_GAMERULES_STATE_GAME_IN_PROGRESS') for (const e of fog) {
+    const p = mmPt(e.x, e.y), R = I * .42;
+    if (e.age < 2 || !p || !sprite(e.hero)) continue;   // < 2 s unseen = most likely a missed minimap detection, not fog
+    const n = node(`ls:${e.hero}`, () => born(mkNode(mm, `<circle r="${R.toFixed(1)}"/><image href="${CDN}${e.hero}.png" x="${-R}" y="${-R}" width="${2 * R}" height="${2 * R}" clip-path="url(#ghc)" filter="url(#fgd)"/>`, true)));
+    if (put(n, '_cl', 1)) n.setAttribute('class', 'ls');
+    const tr = `translate(${p[0].toFixed(1)} ${p[1].toFixed(1)})`; if (put(n, '_t', tr)) n.setAttribute('transform', tr);
+    fade(n, +(Math.max(.35, .95 - e.age / 90)).toFixed(2));
+  }
   // pings for enemies in sight / smoke and the fight X: as before, moved in place (a rebuild restarted the ping loop on every message), and under the ghosts
   for (const t of hud.threats || []) {
     const p = t.kind !== 'missing' && mmPt(t.x, t.y), sm = t.kind === 'smoke', col = sm ? '#ffb02e' : '#ff4d4f';
