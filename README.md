@@ -1,37 +1,98 @@
-# Fogwatch — live Dota 2 coach (`live-coach`)
+<p align="center">
+  <a href="https://imranbug.github.io/fogwatch/"><img src="docs/brand/banner.jpg" alt="Fogwatch: enemy radar for Dota 2 on macOS" width="100%"></a>
+</p>
 
-Local second-monitor Dota 2 coach. Inputs are Valve GSI and screen capture with classical CV. Rules run every 250 ms, and an LLM is called now and then to phrase advice. The dashboard is at `http://127.0.0.1:3939`. Design: `docs/ARCHITECTURE.md`.
+<p align="center">
+  <a href="https://imranbug.github.io/fogwatch/"><img alt="Website" src="https://img.shields.io/badge/website-imranbug.github.io%2Ffogwatch-ffb02e?style=for-the-badge&labelColor=0c0f14"></a>
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-only-ece4d2?style=for-the-badge&logo=apple&logoColor=white&labelColor=0c0f14">
+  <img alt="Free" src="https://img.shields.io/badge/price-free-4fd18b?style=for-the-badge&labelColor=0c0f14">
+  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-6b7686?style=for-the-badge&labelColor=0c0f14"></a>
+</p>
 
-The coach only gives advice. It never reads game memory, sends inputs, or modifies game files. The one exception is the GSI cfg that `install-gsi` writes.
+<p align="center">
+  <b><a href="https://imranbug.github.io/fogwatch/">Website</a></b> ·
+  <b><a href="https://github.com/ImranBug/fogwatch/archive/refs/heads/main.zip">Download for Mac</a></b> ·
+  <b><a href="https://www.youtube.com/@bug81-d3d">Videos</a></b>
+</p>
+
+<p align="center">
+  <img src="docs/screens/radar.jpg" alt="A real moment from a recorded game with Fogwatch's radar: enemy icons in red on the left edge, one in amber where it was last seen, a quiet teammate icon" width="100%">
+  <br><sub>A real moment from a recorded game (17:04), radar drawn by Fogwatch from that moment's game state. Chat blurred.</sub>
+</p>
+
+Fogwatch puts all five enemy heroes on the edge of your screen while you play Dota 2: **red** when you can see them, **amber** where they were last seen, **grey** once the trail goes cold. No account, no API key, no cost.
+
+<table>
+  <tr>
+    <td width="33%" valign="top"><h3>🔴 In sight</h3>The icon pops onto the screen edge the moment they appear. Close out of the fog? It lands big, with a red glow.</td>
+    <td width="33%" valign="top"><h3>🟠 Last seen</h3>They walked into the fog. The arrow points to where you last saw them, with the seconds since, and their face waits on your minimap at that spot.</td>
+    <td width="33%" valign="top"><h3>⚪ Trail gone cold</h3>Once they could be anywhere, the arrow fades into a ring and the icon steps back to a tray above your minimap.</td>
+  </tr>
+  <tr>
+    <td valign="top"><h3>🔺 Gank coming</h3>Heroes from the same side share one arrow. It pulses when a gank looks close.</td>
+    <td valign="top"><h3>🟢 Teammates</h3>Small, dull green and arrow-free out at the edges, so they never pull your eye.</td>
+    <td valign="top"><h3>🧠 Optional AI coach</h3>Your own OpenAI, Jev or Anthropic key adds a game plan, advice and a post-game review. Off by default.</td>
+  </tr>
+</table>
+
+## Not a cheat. A memory.
+
+Fogwatch can't see into the fog. It only remembers what your own screen already showed you.
+
+- ✅ Reads your own screen (the minimap and HUD) and Valve's official Game State Integration
+- ❌ Never reads game memory
+- ❌ Never presses a key or moves your mouse
+- ❌ Never changes game files (apart from the one config file Valve's integration needs)
+- 🔒 Runs on your Mac only: the server listens on `127.0.0.1` and refuses other hosts and non-JSON writes from web pages. With AI off (the default) nothing leaves your computer except downloads of public hero data and icons, and a lookup of your own public match history on OpenDota.
 
 ## Quick start (macOS)
 
-Website: https://imranbug.github.io/fogwatch/ · one-line install: `curl -fsSL https://imranbug.github.io/fogwatch/install.sh | bash`
+**One line** (installs everything and starts Fogwatch):
 
-Fogwatch shows where the five enemy heroes are, or were last seen, as icons around the edge of your screen while you play. That needs no account and no API key and costs nothing.
+```bash
+curl -fsSL https://imranbug.github.io/fogwatch/install.sh | bash
+```
+
+Or by hand:
 
 1. Install [uv](https://docs.astral.sh/uv/): `curl -LsSf https://astral.sh/uv/install.sh | sh`
-2. Download this repo and double-click `start.command`. The first run installs the Python packages and Dota's game-data file (GSI). The dashboard opens at `http://127.0.0.1:3939`.
+2. [Download this repo](https://github.com/ImranBug/fogwatch/archive/refs/heads/main.zip) and double-click `start.command`. The first run installs the Python packages and Dota's game-data file (GSI). The dashboard opens at `http://127.0.0.1:3939`.
 3. Steam → Dota 2 → Properties → Launch Options: add `-gamestateintegration`, then start Dota.
 4. System Settings → Privacy & Security → Screen Recording: allow Terminal, then reopen `start.command`.
 5. Play. The radar appears at the horn and leaves at the end screen.
 
-### What you get
+## The dashboard (second monitor)
 
-- **Enemy radar** (free, always on): all five enemy heroes as icons on the edge of your screen, pointing the way you'd have to look. Red = in sight (bigger when close, pops in when it appears), amber = where it was last seen (with seconds since), fading into a dashed ring and then into a grey tray above the minimap once it could be anywhere.
-- **One arrow per direction**: heroes coming from the same side share one arrow; it pulses when a gank looks close.
-- **No clutter**: an enemy right next to you (already on your screen) gets no icon; nothing is drawn inside the minimap; everything clears at the end screen.
-- **Teammates** nearby in green, smaller and calmer.
-- **Dashboard** at `http://127.0.0.1:3939`: draft, timers, alerts, settings, and the AI switch with your keys.
-- **Optional AI coach and voice** with your own keys (below).
+Draft help, timers, danger, missing enemies and a post-game report, built to be read from the corner of your eye.
 
-### Safety and privacy
-
-- Reads only your own screen (the minimap and HUD) and Valve's official Game State Integration. It never reads game memory, never presses a key or moves the mouse, and changes no game files except the one GSI config file.
-- Everything runs on your Mac. The server listens on `127.0.0.1` only and refuses requests from other hosts or non-JSON writes from web pages.
-- With AI off (the default) nothing leaves your computer except downloads of public hero data and icons, and a lookup of your own public match history on OpenDota (for the post-game report).
+<table>
+  <tr>
+    <td><img src="docs/screens/dash_laning.jpg" alt="Dashboard while laning: FARM card, skill, next item, timers, replica minimap"></td>
+    <td><img src="docs/screens/dash_fight.jpg" alt="Dashboard during a gank: big red BACK card with the two heroes coming"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Laning: one card says what to do</sub></td>
+    <td align="center"><sub>Gank coming: the whole screen says BACK</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screens/dash_draft.jpg" alt="Draft screen: hero suggestions for your role with win rates"></td>
+    <td><img src="docs/screens/dash_post.jpg" alt="Post-game report: deaths timeline, one thing to change, next game's goal"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Draft: picks for your role, with your own win rates</sub></td>
+    <td align="center"><sub>After the game: one thing to change, and next game's goal</sub></td>
+  </tr>
+</table>
 
 **Optional AI coach (your own keys, your own bill):** open the dashboard menu → *AI coach*, paste an OpenAI and/or Jev key and switch *AI on*. It adds a game plan, advice and quick decisions, about $0.02 per game. An Anthropic key adds a post-game review by Claude Opus, about $0.65 per game. Keys are saved only on your computer in `./.env` (see `.env.example`). With AI off, no paid call is ever made: no advice, no decisions, no cloud speech-to-text and no review.
+
+<sub>Fogwatch is not affiliated with or endorsed by Valve. Dota 2 and the Dota 2 logo are trademarks of Valve Corporation. Don't use the coach in ticketed or tournament games.</sub>
+
+---
+
+# Developer docs
+
+Local second-monitor Dota 2 coach (`live-coach`). Inputs are Valve GSI and screen capture with classical CV. Rules run every 250 ms, and an LLM is called now and then to phrase advice. Design: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Setup details (once)
 

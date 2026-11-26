@@ -8,6 +8,7 @@
 <meta property="og:title" content="Fogwatch: know where they were, guess where they are">
 <meta property="og:description" content="A free enemy radar for Dota 2 on macOS. It only remembers what your own minimap showed you.">
 <meta property="og:image" content="https://imranbug.github.io/fogwatch/img/radar.jpg">
+<link rel="icon" href="img/fogwatch-mark.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Inter:wght@400;600&display=swap" rel="stylesheet">
 <style>
@@ -18,7 +19,14 @@ a{color:var(--amber)}
 .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
 header{display:flex;align-items:center;justify-content:space-between;padding:18px 0}
 .mark{font:800 26px/1 "Barlow Condensed",sans-serif;letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;gap:10px}
-.mark i{width:14px;height:14px;border-radius:50%;background:var(--amber);box-shadow:0 0 0 4px rgba(255,176,46,.2)}
+.mark img{width:40px;height:40px}
+.for{display:flex;align-items:center;gap:12px;color:var(--ink-2);font:600 13px Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;margin:6px 0 0}
+.for img{height:30px;width:auto}
+header nav{display:flex;gap:20px}
+.gal{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-top:26px}
+.gal figure{margin:0}
+body{background:radial-gradient(900px 500px at 85% -5%,rgba(255,176,46,.10),transparent 70%),radial-gradient(700px 400px at -10% 30%,rgba(255,77,79,.06),transparent 70%),var(--bg)}
+@media (max-width:600px){header nav a:not(:last-child){display:none}}
 header a{color:var(--ink-2);text-decoration:none;font-weight:600}
 h1{font:800 clamp(36px,9vw,84px)/.95 "Barlow Condensed",sans-serif;text-transform:uppercase;margin:28px 0 18px;letter-spacing:.01em}
 h1 em{font-style:normal;color:var(--amber)}
@@ -57,9 +65,10 @@ footer{padding:40px 0 60px;color:var(--ink-2);font-size:14px;border-top:1px soli
 </head>
 <body>
 <div class="wrap">
-<header><div class="mark"><i></i>Fogwatch</div><a href="https://github.com/ImranBug/fogwatch">GitHub</a></header>
+<header><div class="mark"><img src="img/fogwatch-mark.svg" alt="" width="40" height="40">Fogwatch</div><nav><a href="#dashboard">Dashboard</a><a href="https://www.youtube.com/@bug81-d3d">Videos</a><a href="https://github.com/ImranBug/fogwatch">GitHub</a></nav></header>
 
 <section>
+  <p class="for">Enemy radar for <img src="img/dota2_logo_horiz.png" alt="Dota 2" width="152" height="30"> on macOS</p>
   <h1>Know where they were.<br><em>Guess where they are.</em></h1>
   <p class="lead">A free enemy radar for Dota 2 on macOS. All five enemy heroes sit on the edge of your screen: red when you can see them, amber where they were last seen, grey when the trail goes cold.</p>
 
@@ -85,8 +94,8 @@ footer{padding:40px 0 60px;color:var(--ink-2);font-size:14px;border-top:1px soli
   </div>
 
   <figure>
-    <img src="img/radar.jpg" width="1600" height="900" alt="Dota 2 gameplay with Fogwatch's radar: two enemy icons in red, three in amber where they were last seen, one teammate in green">
-    <figcaption>A real moment from a recorded game (2:16): two enemies in sight in red, three tracked in the fog in amber, a teammate in green. Drawn by Fogwatch from that moment's game state. Chat and names blurred.</figcaption>
+    <img src="img/radar.jpg" width="1600" height="873" alt="Dota 2 gameplay with Fogwatch's radar: two enemy icons in red on the left edge, one in amber where it was last seen">
+    <figcaption>A real moment from a recorded game (17:04): two enemies in sight in red, one last seen in amber. Drawn by Fogwatch from that moment's game state. Chat blurred.</figcaption>
   </figure>
 </section>
 
@@ -98,12 +107,23 @@ footer{padding:40px 0 60px;color:var(--ink-2);font-size:14px;border-top:1px soli
     <div class="state" style="--c:var(--amber)"><b>Last seen</b><p>They walked into the fog. The arrow points to where you last saw them, with the seconds since.</p></div>
     <div class="state" style="--c:var(--grey)"><b>Trail gone cold</b><p>Once they could be anywhere, the arrow fades into a ring and the icon steps back to a tray above your minimap.</p></div>
     <div class="state" style="--c:var(--red)"><b>Gank coming</b><p>Heroes from the same side share one arrow. It pulses when a gank looks close: an enemy near you, or several together.</p></div>
-    <div class="state" style="--c:#4fd18b"><b>Teammates</b><p>Allies nearby show in green, smaller and calmer, so you always know which way help is.</p></div>
+    <div class="state" style="--c:#4fd18b"><b>Teammates</b><p>Small, dull green and arrow-free out at the edges: you know where help is, and they never pull your eye.</p></div>
   </div>
   <figure>
     <video src="img/radar.mp4" autoplay muted loop playsinline width="1600" height="900" style="width:100%;height:auto;display:block;border-radius:6px;border:1px solid var(--line)" aria-label="Six seconds of a recorded game with Fogwatch's radar: enemy icons appearing and moving on the screen edge"></video>
     <figcaption>Six real seconds from a recorded game, radar drawn by Fogwatch from that game's state.</figcaption>
   </figure>
+</section>
+
+<section id="dashboard">
+  <h2>A dashboard for your second screen</h2>
+  <p class="lead">Draft help, timers, danger and a post-game report, built to be read from the corner of your eye.</p>
+  <div class="gal">
+    <figure><img src="img/dash_laning.jpg" width="1600" height="900" loading="lazy" alt="Dashboard while laning: FARM card, skill, next item, timers, replica minimap"><figcaption>Laning: one card says what to do.</figcaption></figure>
+    <figure><img src="img/dash_fight.jpg" width="1600" height="900" loading="lazy" alt="Dashboard during a gank: a big red BACK card with the two heroes coming"><figcaption>Gank coming: the whole screen says BACK.</figcaption></figure>
+    <figure><img src="img/dash_draft.jpg" width="1600" height="900" loading="lazy" alt="Draft screen: hero suggestions for your role with win rates"><figcaption>Draft: picks for your role, with your own win rates.</figcaption></figure>
+    <figure><img src="img/dash_post.jpg" width="1600" height="900" loading="lazy" alt="Post-game report: deaths timeline, one thing to change, next game's goal"><figcaption>After the game: one thing to change, and next game's goal.</figcaption></figure>
+  </div>
 </section>
 
 <section>
@@ -128,7 +148,7 @@ footer{padding:40px 0 60px;color:var(--ink-2);font-size:14px;border-top:1px soli
 </section>
 
 <footer>
-  Fogwatch is free and open source (MIT) · <a href="https://github.com/ImranBug/fogwatch">Source on GitHub</a> · Not affiliated with or endorsed by Valve. Dota 2 is a trademark of Valve Corporation.
+  Fogwatch is free and open source (MIT) · <a href="https://github.com/ImranBug/fogwatch">Source on GitHub</a> · Not affiliated with or endorsed by Valve. Dota 2 and the Dota 2 logo are trademarks of Valve Corporation.
 </footer>
 </div>
 <script>
